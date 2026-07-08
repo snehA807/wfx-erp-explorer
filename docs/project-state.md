@@ -6,10 +6,10 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 `docs/backlog.md` (deferred scope) — this file only answers "what stage is
 the build at."
 
-**Last updated:** 2026-07-08
-**Current milestone:** M1 — DB schema + roles
+**Last updated:** 2026-07-09
+**Current milestone:** M2 — Seed script + integrity gates
 **Status:** ✅ Complete
-**Next milestone:** M2 — Seed script + integrity gates
+**Next milestone:** M3 — FastAPI skeleton
 
 ## Milestone status
 
@@ -17,7 +17,7 @@ the build at."
 |---|---|---|---|
 | M0 | Repo scaffold & CLAUDE.md | 0 — Foundations | ✅ Complete |
 | M1 | DB schema + roles | 0 — Foundations | ✅ Complete |
-| M2 | Seed script + integrity gates | 0 — Foundations | ⬜ Not started |
+| M2 | Seed script + integrity gates | 0 — Foundations | ✅ Complete |
 | M3 | FastAPI skeleton | 1 — Backend core | ⬜ Not started |
 | M4 | Products/detail/filters endpoints | 1 — Backend core | ⬜ Not started |
 | M5 | Dashboard stats | 1 — Backend core | ⬜ Not started |
@@ -39,12 +39,16 @@ the build at."
 
 🔴 = red-flagged risk milestone (playbook.md).
 
-## Open items carried into M2
+## Open items carried into M3
 
 - `docs/backlog.md`: Docker Compose scope conflict (requirements.md vs.
   playbook.md) — still unresolved.
-- ~~`roles.sql` location~~ — resolved: user directed `db/roles.sql` as a
-  sibling to `db/schema.sql`.
-- ~~`DATABASE_URL_OWNER` role ambiguity~~ — resolved during M1: it uses
-  Supabase's built-in `postgres` connection string; no custom owner role is
-  created. See `docs/decisions.md`.
+- `finished_goods.search_text` is generated at seed time by
+  `scripts/seed_db.py::build_search_text()` (concatenates style_name,
+  category, fabric, color, print, season, brand) since no source CSV column
+  exists for it. Not a locked decision — safe to change before M9 embeds it,
+  since re-running the seed script overwrites the column via upsert.
+- `scripts/requirements.txt` pins `psycopg[binary]` for `scripts/` only,
+  since `backend/`'s own dependency manifest doesn't exist until M3 — worth
+  folding into a shared manifest if M3 introduces one, rather than keeping
+  two.

@@ -1,0 +1,4 @@
+# psycopg3 is already named in CLAUDE.md's fixed stack — this file just
+# pins it for scripts/, which runs standalone and predates backend/'s own
+# dependency manifest (created in M3).
+psycopg[binary]>=3.1,<4
