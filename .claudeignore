@@ -1,0 +1,38 @@
+# Data & secrets — never read into context
+data/
+.env
+.env.*
+!.env.example
+
+# Dependencies & builds
+node_modules/
+dist/
+build/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Model & embedding caches
+.fastembed_cache/
+*.onnx
+*.npy
+chroma/
+
+# Media & binaries
+*.png
+*.jpg
+*.jpeg
+*.mp4
+*.zip
+*.pdf
+
+# Lockfiles (read package.json/requirements.txt instead)
+package-lock.json
+pnpm-lock.yaml
+
+# Misc
+.git/
+.vercel/
+coverage/
