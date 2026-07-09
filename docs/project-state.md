@@ -231,12 +231,14 @@ the build at."
        from the `rows` SSE payload and the answer-generation prompt
        (`query_pipeline.py::_strip_hidden_columns`); also pre-empts a crash
        once M9 backfills real (non-JSON-serializable) pgvector values there.
-  - **One known gap found but deliberately not fixed**, per this session's
-    explicit direction to preserve `/query/sql` exactly as implemented in
-    M7: guardrail-block error responses carry `details: null` instead of
-    the blocked SQL, on *both* `/query` and `/query/sql` — confirmed this
-    predates M8 (`core/guardrails.py` never attached it, M7 either).
-    Fixing it touches shared code and would change `/query/sql`'s response
-    shape, so it's logged in `docs/decisions.md` as a fast-follow instead.
+  - **Fast-follow, resolved same day:** guardrail-block error responses
+    (`SQL_BLOCKED`) now carry the blocked SQL in `details` on both
+    `/query/sql` and `/query` — `core/guardrails.py::enforce_guardrails()`
+    attaches `details={"sql": sql}` at the source; every caller already
+    passed `.details` straight through, so no other file needed changes.
+    Response envelope shape unchanged (`details` was already `dict | None`
+    in the contract, just always `None` for this path before). 6 new
+    `tests/test_guardrails.py` cases (CLAUDE.md invariant 6) plus re-
+    verified live against real OpenRouter output on both endpoints.
   - `core/rate_limit.py`'s stale comment (said `/query` "doesn't exist
     until M8" — cosmetic drift from M7) corrected in passing.

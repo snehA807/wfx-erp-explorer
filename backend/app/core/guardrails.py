@@ -55,8 +55,10 @@ def _mask_string_literals(sql: str) -> str:
 def enforce_guardrails(sql: str) -> str:
     """backend-spec.md §4: single statement, SELECT/WITH only, deny-list
     DML/DDL/comment-smuggling, auto-LIMIT 100. Raises SQLGuardrailError
-    (400, SQL_BLOCKED) on any violation; otherwise returns the exact SQL
-    string that is safe to execute.
+    (400, SQL_BLOCKED) on any violation, with the offending SQL attached as
+    `details={"sql": sql}` — design-spec.md's "keep the generated SQL
+    visible" transparency-on-failure requirement (docs/decisions.md).
+    Otherwise returns the exact SQL string that is safe to execute.
 
     Known simplification: LIMIT-presence is checked anywhere in the
     statement, not just at the top level, so `SELECT ... LIMIT 100 UNION
@@ -66,24 +68,29 @@ def enforce_guardrails(sql: str) -> str:
     full parser disproportionate here (docs/decisions.md).
     """
     if not sql or not sql.strip():
-        raise SQLGuardrailError("Empty SQL is not allowed")
+        raise SQLGuardrailError("Empty SQL is not allowed", details={"sql": sql})
 
     if "--" in sql or "/*" in sql or "*/" in sql:
-        raise SQLGuardrailError("SQL comments are not allowed")
+        raise SQLGuardrailError("SQL comments are not allowed", details={"sql": sql})
 
     masked = _mask_string_literals(sql)
 
     statements = [s for s in masked.split(";") if s.strip()]
     if len(statements) != 1:
-        raise SQLGuardrailError("Only a single SQL statement is allowed")
+        raise SQLGuardrailError(
+            "Only a single SQL statement is allowed", details={"sql": sql}
+        )
 
     if not _ALLOWED_START_RE.match(masked.strip()):
-        raise SQLGuardrailError("Only SELECT/WITH statements are allowed")
+        raise SQLGuardrailError(
+            "Only SELECT/WITH statements are allowed", details={"sql": sql}
+        )
 
     denied = _DENYLIST_RE.search(masked)
     if denied:
         raise SQLGuardrailError(
-            f"Statement contains a disallowed keyword: {denied.group(1).upper()}"
+            f"Statement contains a disallowed keyword: {denied.group(1).upper()}",
+            details={"sql": sql},
         )
 
     # Any semicolon surviving in `sql` outside of a masked literal has

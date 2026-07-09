@@ -137,3 +137,48 @@ class TestBlockedStatements:
     def test_semicolon_only_sql_blocked(self) -> None:
         with pytest.raises(SQLGuardrailError):
             enforce_guardrails(";")
+
+
+class TestBlockedStatementDetails:
+    """design-spec.md's "keep the generated SQL visible" requirement:
+    SQLGuardrailError.details must carry the exact SQL that was blocked, on
+    every rejection path, not just some of them."""
+
+    def test_denylisted_keyword_detail_carries_sql(self) -> None:
+        sql = "DROP TABLE finished_goods"
+        with pytest.raises(SQLGuardrailError) as exc_info:
+            enforce_guardrails(sql)
+        assert exc_info.value.details == {"sql": sql}
+
+    def test_non_select_start_detail_carries_sql(self) -> None:
+        sql = "EXPLAIN SELECT 1"
+        with pytest.raises(SQLGuardrailError) as exc_info:
+            enforce_guardrails(sql)
+        assert exc_info.value.details == {"sql": sql}
+
+    def test_statement_chaining_detail_carries_sql(self) -> None:
+        sql = "SELECT 1; DROP TABLE finished_goods"
+        with pytest.raises(SQLGuardrailError) as exc_info:
+            enforce_guardrails(sql)
+        assert exc_info.value.details == {"sql": sql}
+
+    def test_comment_smuggling_detail_carries_sql(self) -> None:
+        sql = "SELECT 1 -- ; DROP TABLE finished_goods"
+        with pytest.raises(SQLGuardrailError) as exc_info:
+            enforce_guardrails(sql)
+        assert exc_info.value.details == {"sql": sql}
+
+    def test_empty_sql_detail_carries_sql(self) -> None:
+        with pytest.raises(SQLGuardrailError) as exc_info:
+            enforce_guardrails("")
+        assert exc_info.value.details == {"sql": ""}
+
+    def test_detail_is_exact_sql_not_masked_or_modified(self) -> None:
+        # The denylist/single-statement checks run against a literal-masked
+        # copy internally; details must still surface the caller's original
+        # string verbatim, not the masked working copy.
+        sql = "DELETE FROM finished_goods WHERE style_name = 'DROP the beat'"
+        with pytest.raises(SQLGuardrailError) as exc_info:
+            enforce_guardrails(sql)
+        assert exc_info.value.details == {"sql": sql}
+        assert "xxxx" not in exc_info.value.details["sql"]

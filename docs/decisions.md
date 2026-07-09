@@ -91,6 +91,19 @@ session's explicit direction to preserve `/query/sql` exactly as
 implemented in M7. Left as a known, pre-existing gap; not introduced by
 M8. Flagged for a fast-follow, not fixed here.
 
+2026-07-10 — M8 (fast-follow) — The `SQL_BLOCKED` `details: null` gap
+(logged above) is fixed: `core/guardrails.py::enforce_guardrails()` now
+attaches `details={"sql": sql}` — the caller's exact, unmasked input — to
+every `SQLGuardrailError` it raises. No change needed in `nl2sql.py`,
+`query_pipeline.py`, or `main.py`: all three already read `exc.details`
+off the exception and pass it straight through, so both `/query/sql` and
+`/query`'s SSE `error` event picked up the fix automatically once
+`details` was populated at the source. Response envelope shape is
+unchanged for both endpoints (`details` was already typed `dict | None`;
+it was simply always `None` for this one error path before). 6 new cases
+added to `tests/test_guardrails.py` per CLAUDE.md invariant 6, plus
+re-verified live against both endpoints with real OpenRouter output.
+
 2026-07-10 — M8 — `core/rate_limit.py`'s `limiter` singleton is applied
 per-route (`@limiter.limit(...)` on both `/query/sql` and `/query`
 independently), matching the pattern M7 already established — each route
