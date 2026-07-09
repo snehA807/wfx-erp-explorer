@@ -13,3 +13,8 @@ slowapi>=0.1.9,<1
 # a no-op on 3.11+ but keeps `pip install -r requirements.txt` sufficient
 # for local dev on whatever Python is actually installed.
 eval_type_backport>=0.2,<1; python_version < "3.10"
+
+# Dev/test only — CLAUDE.md's own Commands section names `pytest -q` as the
+# test command; not a new dependency being introduced, just installing what
+# was already specified.
+pytest>=8.0,<9

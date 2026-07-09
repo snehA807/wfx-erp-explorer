@@ -7,9 +7,9 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 the build at."
 
 **Last updated:** 2026-07-10
-**Current milestone:** M5 — Dashboard stats
+**Current milestone:** M6 — SQL guardrails + tests
 **Status:** ✅ Complete
-**Next milestone:** M6 — SQL guardrails + tests
+**Next milestone:** M7 — Vanna + training package 🔴
 
 ## Milestone status
 
@@ -21,7 +21,7 @@ the build at."
 | M3 | FastAPI skeleton | 1 — Backend core | ✅ Complete |
 | M4 | Products/detail/filters endpoints | 1 — Backend core | ✅ Complete |
 | M5 | Dashboard stats | 1 — Backend core | ✅ Complete |
-| M6 | SQL guardrails + tests | 1 — Backend core | ⬜ Not started |
+| M6 | SQL guardrails + tests | 1 — Backend core | ✅ Complete |
 | M7 | Vanna + training package | 1 — Backend core 🔴 | ⬜ Not started |
 | M8 | /query SSE pipeline | 1 — Backend core | ⬜ Not started |
 | M9 | Offline embeddings job | 1 — Backend core | ⬜ Not started |
@@ -39,7 +39,7 @@ the build at."
 
 🔴 = red-flagged risk milestone (playbook.md).
 
-## Open items carried into M6
+## Open items carried into M7
 
 - `docs/backlog.md`: Docker Compose scope conflict (requirements.md vs.
   playbook.md) — still unresolved.
@@ -91,7 +91,7 @@ the build at."
   didn't block M4, but the read-only-role defense-in-depth layer
   (CLAUDE.md invariant 3, backend-spec.md §4) is not actually in effect
   yet. Must be fixed (set `app_readonly`'s password, point `DATABASE_URL`
-  at it) before M11 deploy. Still open after M5 — M5 is read-only too.
+  at it) before M11 deploy. Still open after M5/M6 — both are read-only.
 - M5 (`GET /dashboard/stats`) verified live: revenue excl.
   Cancelled = ₹3,343,324,073 vs. ₹3,520,227,834 including it (matches
   independent SQL computed with a differently-shaped query); the 11
@@ -105,3 +105,24 @@ the build at."
   cache verified directly (same object within TTL, re-fetched with
   consistent values after expiry via a monkeypatched short TTL). No bugs
   found this milestone.
+- M6 (`core/guardrails.py` + `tests/test_guardrails.py`): 35 test cases
+  (playbook.md asked for ~20), all green — allowed SELECT/CTE/join/
+  aggregate shapes with and without an existing LIMIT, plus blocked DML/
+  DDL/DCL, statement chaining, both comment styles, a data-modifying CTE
+  (`WITH d AS (DELETE ... RETURNING *) SELECT * FROM d` — starts with WITH
+  so a naive "starts with SELECT/WITH" check alone would miss it), and a
+  `SELECT ... INTO` DDL-via-SELECT bypass. String literals are masked
+  (length-preserving) before any structural check, so data values
+  containing semicolons or denylisted words (e.g. a fabric-care note with
+  "DROP" in it) are never misread as SQL structure. Also verified two
+  guardrail-approved queries (a plain SELECT and a GROUP BY CTE) actually
+  execute correctly against the real Supabase DB, including confirming the
+  auto-LIMIT truly caps `finished_goods` (1000 rows) at 100. One accepted
+  simplification logged in `docs/decisions.md`: LIMIT-presence is detected
+  anywhere in the statement, not only at the top level.
+- Added `pytest>=8.0,<9` to `backend/requirements.txt` (dev/test only —
+  already named by CLAUDE.md's own `pytest -q` command, not a new
+  dependency choice) and `backend/pytest.ini` (`pythonpath = .`) so `pytest
+  -q` from `backend/` can resolve `from app...` imports — there's no
+  `tests/__init__.py`, so pytest's default import-mode wouldn't otherwise
+  put `backend/` itself on `sys.path`.
