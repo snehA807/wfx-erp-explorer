@@ -93,3 +93,72 @@ def create_chat_completion(
         "completion_tokens": completion_tokens,
         "cost_usd": cost_usd,
     }
+
+
+class StreamedCompletion:
+    """Streaming counterpart to create_chat_completion, used only by M8's
+    /query answer-generation call (design-spec.md: the prose answer streams
+    token-by-token). Retries once, but only before the first chunk has been
+    read — once iteration has yielded content to the caller (which by then
+    may already be on the wire to a client), a dropped connection surfaces
+    as LLMError instead of silently retrying and duplicating output.
+
+    Usage: `for delta in StreamedCompletion(messages, max_tokens=N): ...`,
+    then read `.usage` once iteration completes (mirrors the (content,
+    usage) tuple create_chat_completion returns, just split across the
+    iteration boundary since a generator can't return a value through
+    a plain `for` loop).
+    """
+
+    def __init__(self, messages: list[dict], *, max_tokens: int) -> None:
+        self._messages = messages
+        self._max_tokens = max_tokens
+        settings = get_settings()
+        self.usage: dict = {
+            "model": settings.openrouter_model,
+            "prompt_tokens": None,
+            "completion_tokens": None,
+            "cost_usd": None,
+        }
+
+    def _open_stream(self):
+        settings = get_settings()
+        client = get_openrouter_client()
+        return client.chat.completions.create(
+            model=settings.openrouter_model,
+            messages=self._messages,
+            max_tokens=self._max_tokens,
+            temperature=0,
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+
+    def __iter__(self):
+        try:
+            stream = self._open_stream()
+        except openai.OpenAIError as exc:
+            logger.warning("openrouter_stream_request_failed", attempt=0, error=str(exc))
+            time.sleep(_RETRY_BACKOFF_SECONDS)
+            try:
+                stream = self._open_stream()
+            except openai.OpenAIError as exc2:
+                raise LLMError(
+                    "OpenRouter request failed after retry", code="LLM_UNAVAILABLE"
+                ) from exc2
+
+        try:
+            for chunk in stream:
+                if chunk.usage is not None:
+                    self.usage["prompt_tokens"] = chunk.usage.prompt_tokens
+                    self.usage["completion_tokens"] = chunk.usage.completion_tokens
+                    self.usage["cost_usd"] = getattr(chunk.usage, "cost", None)
+                if chunk.choices:
+                    delta = chunk.choices[0].delta.content
+                    if delta:
+                        yield delta
+        except openai.OpenAIError as exc:
+            raise LLMError(
+                "OpenRouter stream interrupted", code="LLM_UNAVAILABLE"
+            ) from exc
+        finally:
+            logger.info("token_cost", **self.usage)

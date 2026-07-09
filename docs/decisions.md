@@ -44,3 +44,58 @@ semantic retrieval should still match closely — train_check.py passed
 built — docs/implementationM7.md §12 frames it as a contingency, and
 building unused code for a threshold that wasn't crossed would be
 scope creep beyond M7.
+
+2026-07-10 — M8 — Zero-row results skip the second (answer-generation) LLM
+call entirely; `services/query_pipeline.py` emits a fixed honest-prose
+string instead. design-spec.md only requires "the AI answer states this in
+prose, never a bare empty table" — it doesn't require an LLM call
+specifically, and a templated message can't hallucinate over empty data,
+costs nothing, and is one round-trip faster.
+
+2026-07-10 — M8 — `POST /query`'s `rows` SSE event and the answer-generation
+prompt both strip `text_embedding`/`image_embedding` from any result set
+(`services/query_pipeline.py::_strip_hidden_columns`), even though
+guardrails don't block `SELECT *`. Found live: a `SELECT *` question
+returned these two vector columns despite ddl.sql deliberately hiding them
+from Vanna's trained schema (docs/implementationM7.md §4) — training-time
+hiding doesn't survive execution-time `SELECT *`. Left `core/guardrails.py`
+unchanged (this is a payload-hygiene/cost concern, not a write-safety one,
+so it doesn't need guardrails' denylist-and-block treatment) and fixed at
+the serialization boundary instead; also pre-empts a crash once M9
+backfills real (non-JSON-serializable) pgvector values into these columns.
+
+2026-07-10 — M8 — `db/session.py::get_connection()` now pings
+(`SELECT 1`) the cached connection before returning it, reconnecting
+transparently on failure, and the underlying `psycopg.connect()` call now
+sets short TCP keepalives (20s idle / 10s interval / 3 probes). Found live:
+a connection left idle ~9 minutes between requests was silently dropped
+(by Supabase's pooler or an intermediate network hop) without a clean
+FIN/RST — `.closed` still read `False`, so the next `execute()` hung
+indefinitely instead of erroring. This affects every DB-touching endpoint
+(M4/M5 included), not just M8's new `/query`; M8 surfaced it because it was
+the first endpoint exercised after a multi-minute idle gap in this
+session. Still a single lazy-singleton connection — no pooling library, no
+architecture change, `app_readonly` migration still deferred to M11 as
+directed.
+
+2026-07-10 — M8 — `POST /query`'s `SQLGuardrailError` (`SQL_BLOCKED`) SSE
+`error` event carries `details: null`, not the blocked SQL, even though
+docs/implementationM7.md §8 and design-spec.md ("keep the generated SQL
+visible" on failure) both call for it. Root cause: `core/guardrails.py`'s
+`enforce_guardrails()` never attached the offending SQL to the exception's
+`details` in M7 either — confirmed live that `POST /query/sql` has the
+same gap today. Fixing it means editing either `enforce_guardrails()` or
+`Nl2SqlService.generate_sql()` (both shared with `/query/sql`), which
+would change `/query/sql`'s error response shape — out of scope given this
+session's explicit direction to preserve `/query/sql` exactly as
+implemented in M7. Left as a known, pre-existing gap; not introduced by
+M8. Flagged for a fast-follow, not fixed here.
+
+2026-07-10 — M8 — `core/rate_limit.py`'s `limiter` singleton is applied
+per-route (`@limiter.limit(...)` on both `/query/sql` and `/query`
+independently), matching the pattern M7 already established — each route
+gets its own 10/min/IP counter rather than a single bucket shared across
+the whole `/query*` prefix backend-spec.md §3's table notation might
+imply. Not changed here: this is M7's existing pattern (slowapi's default
+per-endpoint scoping), and building a cross-route shared-limit key is a
+bigger call than a same-session M8 fix should make unilaterally.

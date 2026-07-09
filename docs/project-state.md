@@ -7,9 +7,9 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 the build at."
 
 **Last updated:** 2026-07-10
-**Current milestone:** M7 — Vanna + training package 🔴
+**Current milestone:** M8 — /query SSE pipeline
 **Status:** ✅ Complete
-**Next milestone:** M8 — /query SSE pipeline
+**Next milestone:** M9 — Offline embeddings job
 
 ## Milestone status
 
@@ -23,7 +23,7 @@ the build at."
 | M5 | Dashboard stats | 1 — Backend core | ✅ Complete |
 | M6 | SQL guardrails + tests | 1 — Backend core | ✅ Complete |
 | M7 | Vanna + training package | 1 — Backend core 🔴 | ✅ Complete |
-| M8 | /query SSE pipeline | 1 — Backend core | ⬜ Not started |
+| M8 | /query SSE pipeline | 1 — Backend core | ✅ Complete |
 | M9 | Offline embeddings job | 1 — Backend core | ⬜ Not started |
 | M10 | Search endpoints | 1 — Backend core | ⬜ Not started |
 | M11 | Backend to production | 2 — Deploy early 🔴 | ⬜ Not started |
@@ -39,7 +39,7 @@ the build at."
 
 🔴 = red-flagged risk milestone (playbook.md).
 
-## Open items carried into M8
+## Open items carried into M9
 
 - `docs/backlog.md`: Docker Compose scope conflict — resolved 2026-07-10
   (`docs/decisions.md`): playbook.md is the execution authority, stays in
@@ -185,3 +185,58 @@ the build at."
   - Rate limiting (10/min/IP) on `POST /query/sql` verified live: blocked
     with a proper `RATE_LIMITED` envelope after ~9-10 requests in a tight
     loop.
+- **M8 (`/query` SSE pipeline, backend-spec.md §3: `status -> sql -> rows ->
+  answer(tokens) -> done/error`):** `POST /query/sql` (M7) left completely
+  unmodified — `nl2sql.py` and `core/guardrails.py` untouched. New pieces:
+  `services/query_pipeline.py::stream_query()` (generate → guard → execute →
+  answer, as SSE bytes), `StreamedCompletion` in `services/llm.py` (streaming
+  counterpart to `create_chat_completion`, temperature 0, `stream_options:
+  {include_usage: true}` so OpenRouter's exact per-request cost still lands
+  even in streaming mode), and five new Pydantic event-payload models in
+  `models/responses/query.py`. `POST /query` uses FastAPI's built-in
+  `StreamingResponse` — no new dependency. All errors (guardrail block, LLM
+  failure, unready service, unhandled exception) are caught **inside** the
+  generator and emitted as a structured `error` SSE event, since
+  `main.py`'s global exception handlers can't intervene once the stream has
+  started (headers already sent at 200).
+  - Zero-row results skip the second LLM call and emit a fixed honest-prose
+    string instead (`docs/decisions.md`) — matches design-spec.md's "never a
+    bare empty table" requirement without spending a token or risking
+    hallucination over empty data.
+  - Verified live end-to-end against real OpenRouter + Supabase: a
+    revenue-ranking question (correct application of the CLAUDE.md revenue
+    rule, ₹-formatted prose, token-by-token streamed answer), a zero-row
+    question, a non-empty `SELECT *` question, an outright destructive
+    request ("delete all cancelled orders" — refused by the model itself,
+    LLM_ERROR, closes cleanly) and an adversarial prompt engineered to make
+    the model emit real `DELETE` SQL text (caught by guardrails,
+    SQL_BLOCKED, closes cleanly) — satisfies definition-of-done.md's "delete
+    all orders is blocked gracefully" project-done criterion. Rate limiting
+    burst-tested on the new endpoint directly: exactly 10 requests passed,
+    11th+ got a proper `RATE_LIMITED` envelope. Total OpenRouter spend this
+    session (dependency proof + all live verification calls): **$0.0022**.
+  - **Two real bugs found and fixed during live verification, both
+    documented in `docs/decisions.md`:**
+    1. `db/session.py`'s lazy-singleton connection hung *indefinitely* (not
+       erroring) on the first query after the connection sat idle a few
+       minutes — a silently-dropped socket that `.closed` doesn't detect.
+       Fixed with short TCP keepalives + a liveness ping before reuse. This
+       predates M8 (same connection singleton since M3) and affects every
+       DB-touching endpoint, not just `/query`; M8 just happened to be the
+       first thing exercised after an idle gap in this session.
+    2. `SELECT *` questions returned the `text_embedding`/`image_embedding`
+       vector columns despite `vanna_training/ddl.sql` deliberately hiding
+       them from the model's trained schema — training-time hiding doesn't
+       constrain execution-time `SELECT *`. Fixed by stripping both columns
+       from the `rows` SSE payload and the answer-generation prompt
+       (`query_pipeline.py::_strip_hidden_columns`); also pre-empts a crash
+       once M9 backfills real (non-JSON-serializable) pgvector values there.
+  - **One known gap found but deliberately not fixed**, per this session's
+    explicit direction to preserve `/query/sql` exactly as implemented in
+    M7: guardrail-block error responses carry `details: null` instead of
+    the blocked SQL, on *both* `/query` and `/query/sql` — confirmed this
+    predates M8 (`core/guardrails.py` never attached it, M7 either).
+    Fixing it touches shared code and would change `/query/sql`'s response
+    shape, so it's logged in `docs/decisions.md` as a fast-follow instead.
+  - `core/rate_limit.py`'s stale comment (said `/query` "doesn't exist
+    until M8" — cosmetic drift from M7) corrected in passing.
