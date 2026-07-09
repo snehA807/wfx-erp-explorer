@@ -19,7 +19,7 @@ from app.core.errors import AppError
 from app.core.rate_limit import limiter
 from app.db.session import close_connection
 from app.models.responses.envelope import ErrorDetail, ErrorEnvelope
-from app.routers import meta, products
+from app.routers import dashboard, meta, products
 
 structlog.configure(
     processors=[
@@ -126,3 +126,4 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 app.include_router(meta.router, prefix="/api/v1")
 app.include_router(products.router, prefix="/api/v1")
+app.include_router(dashboard.router, prefix="/api/v1")

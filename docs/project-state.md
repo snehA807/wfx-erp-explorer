@@ -7,9 +7,9 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 the build at."
 
 **Last updated:** 2026-07-10
-**Current milestone:** M4 — Products/detail/filters endpoints
+**Current milestone:** M5 — Dashboard stats
 **Status:** ✅ Complete
-**Next milestone:** M5 — Dashboard stats
+**Next milestone:** M6 — SQL guardrails + tests
 
 ## Milestone status
 
@@ -20,7 +20,7 @@ the build at."
 | M2 | Seed script + integrity gates | 0 — Foundations | ✅ Complete |
 | M3 | FastAPI skeleton | 1 — Backend core | ✅ Complete |
 | M4 | Products/detail/filters endpoints | 1 — Backend core | ✅ Complete |
-| M5 | Dashboard stats | 1 — Backend core | ⬜ Not started |
+| M5 | Dashboard stats | 1 — Backend core | ✅ Complete |
 | M6 | SQL guardrails + tests | 1 — Backend core | ⬜ Not started |
 | M7 | Vanna + training package | 1 — Backend core 🔴 | ⬜ Not started |
 | M8 | /query SSE pipeline | 1 — Backend core | ⬜ Not started |
@@ -39,7 +39,7 @@ the build at."
 
 🔴 = red-flagged risk milestone (playbook.md).
 
-## Open items carried into M5
+## Open items carried into M6
 
 - `docs/backlog.md`: Docker Compose scope conflict (requirements.md vs.
   playbook.md) — still unresolved.
@@ -91,4 +91,17 @@ the build at."
   didn't block M4, but the read-only-role defense-in-depth layer
   (CLAUDE.md invariant 3, backend-spec.md §4) is not actually in effect
   yet. Must be fixed (set `app_readonly`'s password, point `DATABASE_URL`
-  at it) before M11 deploy.
+  at it) before M11 deploy. Still open after M5 — M5 is read-only too.
+- M5 (`GET /dashboard/stats`) verified live: revenue excl.
+  Cancelled = ₹3,343,324,073 vs. ₹3,520,227,834 including it (matches
+  independent SQL computed with a differently-shaped query); the 11
+  category-revenue rows sum exactly to the total; the 5 order-status counts
+  sum exactly to 1500 total orders. `recent_orders` intentionally shows all
+  statuses (including Cancelled) — the CLAUDE.md revenue exclusion rule
+  applies only to the revenue figures, not to order listings/counts.
+  `order_number` (zero-padded `SO-#####`) is used as the recency sort key
+  instead of `shipment_date`, since shipment_date is a planned/actual ship
+  date uncorrelated with order-creation order. 5-minute in-process TTL
+  cache verified directly (same object within TTL, re-fetched with
+  consistent values after expiry via a monkeypatched short TTL). No bugs
+  found this milestone.
