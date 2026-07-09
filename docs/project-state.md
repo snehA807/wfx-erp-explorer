@@ -6,10 +6,10 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 `docs/backlog.md` (deferred scope) — this file only answers "what stage is
 the build at."
 
-**Last updated:** 2026-07-09
-**Current milestone:** M3 — FastAPI skeleton
+**Last updated:** 2026-07-10
+**Current milestone:** M4 — Products/detail/filters endpoints
 **Status:** ✅ Complete
-**Next milestone:** M4 — Products/detail/filters endpoints
+**Next milestone:** M5 — Dashboard stats
 
 ## Milestone status
 
@@ -19,7 +19,7 @@ the build at."
 | M1 | DB schema + roles | 0 — Foundations | ✅ Complete |
 | M2 | Seed script + integrity gates | 0 — Foundations | ✅ Complete |
 | M3 | FastAPI skeleton | 1 — Backend core | ✅ Complete |
-| M4 | Products/detail/filters endpoints | 1 — Backend core | ⬜ Not started |
+| M4 | Products/detail/filters endpoints | 1 — Backend core | ✅ Complete |
 | M5 | Dashboard stats | 1 — Backend core | ⬜ Not started |
 | M6 | SQL guardrails + tests | 1 — Backend core | ⬜ Not started |
 | M7 | Vanna + training package | 1 — Backend core 🔴 | ⬜ Not started |
@@ -39,7 +39,7 @@ the build at."
 
 🔴 = red-flagged risk milestone (playbook.md).
 
-## Open items carried into M4
+## Open items carried into M5
 
 - `docs/backlog.md`: Docker Compose scope conflict (requirements.md vs.
   playbook.md) — still unresolved.
@@ -62,3 +62,33 @@ the build at."
   Python 3.11 deploy target; only exists to verify locally against this
   machine's Python 3.9. Fine to remove once the dev machine/CI is on 3.11+
   if it ever reads as clutter.
+- **DB connectivity blocker (session-handoff.md Open issue #1) resolved**:
+  `backend/.env`'s `DATABASE_URL` now uses Supabase's pooler connection
+  string. All M4 verification ran against the real Supabase DB successfully.
+- `GET /products/{style_number}/similar` is implemented as a real HNSW
+  cosine-distance lookup on `text_embedding`, but returns an honestly empty
+  list pre-M9 — confirmed live that all 1000 `finished_goods` rows still
+  have `text_embedding IS NULL`. No fabricated similarity logic; revisit
+  once M9 backfills embeddings (nothing to change in the endpoint itself,
+  since the query already excludes NULL embeddings on both sides).
+- Query-param dependency gotcha (found + fixed during M4 verification):
+  FastAPI's bare `Depends()` on a Pydantic model only extracts individual
+  declared fields as separate `Query(...)` params — it does not validate
+  the model as a whole. That silently defeated both the `min_price <=
+  max_price` / `min_gsm <= max_gsm` cross-field `model_validator` (raised a
+  raw `pydantic.ValidationError` that fell through to the generic 500
+  handler instead of a 422 envelope) and `extra="forbid"` (unknown query
+  params were dropped, not rejected). Fixed in `routers/products.py` by
+  switching to `Annotated[ProductListParams, Query()]`, which runs full
+  model validation and is the FastAPI-supported pattern for Pydantic-model
+  query params (available since FastAPI 0.115, well under the installed
+  0.128.8). Worth remembering for any future GET endpoint that takes a
+  multi-field Pydantic query model (e.g. `/search/products` in M10).
+- session-handoff.md Open issue #2 is **still open**: the pooler
+  `DATABASE_URL` used for M4 verification connects as `postgres.<project>`
+  (the Supabase superuser), not `app_readonly` — confirmed by inspecting
+  the configured role directly. M4's own queries are all read-only so this
+  didn't block M4, but the read-only-role defense-in-depth layer
+  (CLAUDE.md invariant 3, backend-spec.md §4) is not actually in effect
+  yet. Must be fixed (set `app_readonly`'s password, point `DATABASE_URL`
+  at it) before M11 deploy.
