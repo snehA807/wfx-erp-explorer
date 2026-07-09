@@ -1,0 +1,160 @@
+# 18 golden question/SQL pairs for Vanna training and scripts/train_check.py.
+# Every `sql` value below was executed against the real Supabase DB and
+# hand-verified (row counts / sample rows sanity-checked) before entering
+# this file (docs/project-state.md, M7).
+#
+# Pairs 1-9 cover the assignment's example questions. NOTE: the original
+# assignment document is not checked into this repo, so the exact question
+# wording below is composed from the topics described in
+# docs/implementationM7.md §4, not transcribed verbatim from an assignment
+# PDF. If the literal wording differs from what evaluators type, Vanna's
+# semantic retrieval should still match closely enough — flagged here
+# rather than silently assumed correct.
+#
+# Pairs 10-18 cover additional SQL shapes: multi-join, GROUP BY + HAVING,
+# revenue-rule application, date filtering, LEFT JOIN invoice-absence,
+# top-N ranking, AVG with rounding, a tech-pack join, a payment-status
+# aggregate.
+
+- question: "Show me all cotton shirts supplied by ABC Textiles"
+  sql: >
+    SELECT fg.style_number, fg.style_name, fg.fabric, fg.color
+    FROM finished_goods fg
+    JOIN suppliers s ON s.supplier_id = fg.supplier_id
+    WHERE fg.category ILIKE 'Shirt' AND fg.fabric ILIKE '%cotton%'
+      AND s.company_name ILIKE 'ABC Textiles'
+    ORDER BY fg.style_number
+
+- question: "Which buyers have placed orders for products with GSM above 220?"
+  sql: >
+    SELECT DISTINCT b.company_name
+    FROM sales_orders so
+    JOIN buyers b ON b.buyer_id = so.buyer_id
+    JOIN finished_goods fg ON fg.style_number = so.style_number
+    WHERE fg.gsm > 220
+    ORDER BY b.company_name
+
+- question: "Show me blue striped shirts"
+  sql: >
+    SELECT style_number, style_name, color, print
+    FROM finished_goods
+    WHERE category ILIKE 'Shirt' AND color ILIKE '%blue%' AND print = 'Printed'
+    ORDER BY style_number
+
+- question: "Which supplier has the highest average order value?"
+  sql: >
+    SELECT s.company_name AS supplier, ROUND(AVG(so.quantity * so.unit_price), 2) AS avg_order_value
+    FROM sales_orders so
+    JOIN finished_goods fg ON fg.style_number = so.style_number
+    JOIN suppliers s ON s.supplier_id = fg.supplier_id
+    GROUP BY s.company_name
+    ORDER BY avg_order_value DESC
+    LIMIT 1
+
+- question: "Which supplier supplies the most denim products?"
+  sql: >
+    SELECT s.company_name AS supplier, COUNT(*) AS denim_count
+    FROM finished_goods fg
+    JOIN suppliers s ON s.supplier_id = fg.supplier_id
+    WHERE fg.fabric ILIKE '%denim%'
+    GROUP BY s.company_name
+    ORDER BY denim_count DESC
+    LIMIT 1
+
+- question: "Show me black hoodies under ₹900"
+  sql: >
+    SELECT style_number, style_name, color, selling_price
+    FROM finished_goods
+    WHERE category ILIKE 'Hoodie' AND color ILIKE '%black%' AND selling_price < 900
+    ORDER BY selling_price ASC
+
+- question: "Which buyer has generated the highest revenue?"
+  sql: >
+    SELECT b.company_name AS buyer, SUM(so.quantity * so.unit_price) AS revenue
+    FROM sales_orders so
+    JOIN buyers b ON b.buyer_id = so.buyer_id
+    WHERE so.status != 'Cancelled'
+    GROUP BY b.company_name
+    ORDER BY revenue DESC
+    LIMIT 1
+
+- question: "Show me pending invoices above ₹1,000"
+  sql: >
+    SELECT invoice_number, order_number, amount, currency
+    FROM sales_invoices
+    WHERE payment_status = 'Pending' AND amount > 1000
+    ORDER BY amount DESC
+
+- question: "List blue striped shirts in the catalog"
+  sql: >
+    SELECT style_number, style_name, fabric, color
+    FROM finished_goods
+    WHERE category ILIKE 'Shirt' AND color ILIKE '%blue%' AND print = 'Printed'
+    ORDER BY style_name
+
+- question: "Which buyers have purchased jackets supplied by Colombo Apparel Group?"
+  sql: >
+    SELECT DISTINCT b.company_name
+    FROM sales_orders so
+    JOIN buyers b ON b.buyer_id = so.buyer_id
+    JOIN finished_goods fg ON fg.style_number = so.style_number
+    JOIN suppliers s ON s.supplier_id = fg.supplier_id
+    WHERE fg.category ILIKE 'Jacket' AND s.company_name ILIKE 'Colombo Apparel Group'
+    ORDER BY b.company_name
+
+- question: "Which fabric types are used in more than 60 products?"
+  sql: >
+    SELECT fabric, COUNT(*) AS product_count
+    FROM finished_goods
+    GROUP BY fabric
+    HAVING COUNT(*) > 60
+    ORDER BY product_count DESC
+
+- question: "What is the total revenue excluding cancelled orders?"
+  sql: >
+    SELECT SUM(quantity * unit_price) AS total_revenue
+    FROM sales_orders
+    WHERE status != 'Cancelled'
+
+- question: "Which orders are scheduled to ship in December 2026?"
+  sql: >
+    SELECT order_number, style_number, shipment_date, status
+    FROM sales_orders
+    WHERE shipment_date >= '2026-12-01' AND shipment_date < '2027-01-01'
+    ORDER BY shipment_date
+
+- question: "Which orders do not have an invoice yet?"
+  sql: >
+    SELECT so.order_number, so.status
+    FROM sales_orders so
+    LEFT JOIN sales_invoices si ON si.order_number = so.order_number
+    WHERE si.invoice_number IS NULL
+    ORDER BY so.order_number
+
+- question: "What are the top 5 best-selling styles by total quantity ordered?"
+  sql: >
+    SELECT fg.style_number, fg.style_name, SUM(so.quantity) AS total_quantity
+    FROM sales_orders so
+    JOIN finished_goods fg ON fg.style_number = so.style_number
+    GROUP BY fg.style_number, fg.style_name
+    ORDER BY total_quantity DESC
+    LIMIT 5
+
+- question: "What is the average selling price of jackets, rounded to two decimal places?"
+  sql: >
+    SELECT ROUND(AVG(selling_price), 2) AS avg_price
+    FROM finished_goods
+    WHERE category ILIKE 'Jacket'
+
+- question: "Show the wash instructions and construction details for style WFX-2501"
+  sql: >
+    SELECT fg.style_number, fg.style_name, tp.wash_instructions, tp.construction
+    FROM finished_goods fg
+    JOIN tech_packs tp ON tp.style_number = fg.style_number
+    WHERE fg.style_number = 'WFX-2501'
+
+- question: "How many invoices are overdue?"
+  sql: >
+    SELECT COUNT(*) AS overdue_count
+    FROM sales_invoices
+    WHERE payment_status = 'Overdue'

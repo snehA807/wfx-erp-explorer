@@ -19,7 +19,8 @@ from app.core.errors import AppError
 from app.core.rate_limit import limiter
 from app.db.session import close_connection
 from app.models.responses.envelope import ErrorDetail, ErrorEnvelope
-from app.routers import dashboard, meta, products
+from app.routers import dashboard, meta, products, query
+from app.services.nl2sql import get_nl2sql_service
 
 structlog.configure(
     processors=[
@@ -34,6 +35,11 @@ logger = structlog.get_logger()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Synchronous, on purpose (docs/implementationM7.md §5): the training
+    # corpus is tiny (~seconds once Chroma's embedding model is cached), and
+    # a training failure should fail the boot loudly rather than leave the
+    # app half-alive — either /query/sql works or /health says why.
+    get_nl2sql_service().train()
     yield
     close_connection()
 
@@ -127,3 +133,4 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 app.include_router(meta.router, prefix="/api/v1")
 app.include_router(products.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
+app.include_router(query.router, prefix="/api/v1")

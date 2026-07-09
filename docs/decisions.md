@@ -22,8 +22,25 @@ would close this, but is disproportionate for a module that only ever wraps
 LLM-generated SQL, sits behind the `app_readonly` role's own
 `statement_timeout`, and is a 1.5h/LOW-risk milestone per playbook.md.
 
-<!-- Example, remove once a second real entry lands:
-2026-07-09 — M7 — invoked Vanna→retrieval-prompting escape hatch — golden-query
-pass rate was 9/18 after the 90-minute timebox, below the 12/18 threshold in
-architecture.md §5
--->
+2026-07-10 — M7 — Docker Compose scope conflict (open issue #3, backlog.md)
+resolved: playbook.md is the execution authority; Compose stays on the
+cut-order list and ships only if M18 runs on schedule — decided once per
+docs/implementationM7.md §13 rather than re-litigated at M18.
+
+2026-07-10 — M7 — 9 of the 18 `golden_queries.yaml` question strings are
+composed from the topic descriptions in docs/implementationM7.md §4
+("cotton shirts by ABC Textiles", "buyers above 220 GSM", etc.), not
+transcribed verbatim from the original assignment document — that
+document isn't checked into this repo and wasn't otherwise available.
+Every reference SQL was still executed against live Supabase and hand-
+verified; only the exact English wording of these 9 questions is an
+approximation. If an evaluator's literal wording differs, Vanna's
+semantic retrieval should still match closely — train_check.py passed
+18/18 against the wording actually used.
+
+2026-07-10 — M7 — Vanna→retrieval-prompting escape hatch (architecture.md
+§5) was **not** invoked: train_check.py passed 18/18 on both full runs
+(well above the 12/18 gate), so the escape hatch code itself was not
+built — docs/implementationM7.md §12 frames it as a contingency, and
+building unused code for a threshold that wasn't crossed would be
+scope creep beyond M7.

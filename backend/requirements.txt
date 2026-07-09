@@ -18,3 +18,16 @@ eval_type_backport>=0.2,<1; python_version < "3.10"
 # test command; not a new dependency being introduced, just installing what
 # was already specified.
 pytest>=8.0,<9
+
+# M7 (docs/implementationM7.md): Vanna AI + OpenRouter for NL2SQL, per
+# CLAUDE.md's fixed stack. Pinned to exact versions proven to install
+# cleanly on this machine's Python 3.9 while targeting 3.11 in Docker —
+# vanna's class-composition API (ChromaDB_VectorStore + OpenAI_Chat) moved
+# to `vanna.legacy.*` in vanna>=2, a floating version range would silently
+# break the import path on the next major release.
+vanna==2.0.2
+chromadb==1.5.9
+openai==2.45.0
+# Direct dependency now (services/nl2sql.py parses golden_queries.yaml)
+# rather than just a transitive one pulled in by vanna/chromadb.
+PyYAML==6.0.3

@@ -7,9 +7,9 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 the build at."
 
 **Last updated:** 2026-07-10
-**Current milestone:** M6 — SQL guardrails + tests
+**Current milestone:** M7 — Vanna + training package 🔴
 **Status:** ✅ Complete
-**Next milestone:** M7 — Vanna + training package 🔴
+**Next milestone:** M8 — /query SSE pipeline
 
 ## Milestone status
 
@@ -22,7 +22,7 @@ the build at."
 | M4 | Products/detail/filters endpoints | 1 — Backend core | ✅ Complete |
 | M5 | Dashboard stats | 1 — Backend core | ✅ Complete |
 | M6 | SQL guardrails + tests | 1 — Backend core | ✅ Complete |
-| M7 | Vanna + training package | 1 — Backend core 🔴 | ⬜ Not started |
+| M7 | Vanna + training package | 1 — Backend core 🔴 | ✅ Complete |
 | M8 | /query SSE pipeline | 1 — Backend core | ⬜ Not started |
 | M9 | Offline embeddings job | 1 — Backend core | ⬜ Not started |
 | M10 | Search endpoints | 1 — Backend core | ⬜ Not started |
@@ -39,10 +39,11 @@ the build at."
 
 🔴 = red-flagged risk milestone (playbook.md).
 
-## Open items carried into M7
+## Open items carried into M8
 
-- `docs/backlog.md`: Docker Compose scope conflict (requirements.md vs.
-  playbook.md) — still unresolved.
+- `docs/backlog.md`: Docker Compose scope conflict — resolved 2026-07-10
+  (`docs/decisions.md`): playbook.md is the execution authority, stays in
+  the cut order.
 - `finished_goods.search_text` is generated at seed time by
   `scripts/seed_db.py::build_search_text()` (concatenates style_name,
   category, fabric, color, print, season, brand) since no source CSV column
@@ -126,3 +127,61 @@ the build at."
   -q` from `backend/` can resolve `from app...` imports — there's no
   `tests/__init__.py`, so pytest's default import-mode wouldn't otherwise
   put `backend/` itself on `sys.path`.
+- **M7 (Vanna + training package, docs/implementationM7.md is the written
+  spec):** `train_check.py` passed **18/18 on both full runs** — no
+  wobble, well above the 12/18 gate. Escape hatch not built (M7 frames it
+  as a contingency for <12/18; building unused code for an uncrossed
+  threshold would be scope creep). Total OpenRouter spend across the
+  entire session (dependency proof calls + 2 full 18-question runs, ~50
+  real calls): **$0.0067 of the $5 budget** — confirmed live via
+  OpenRouter's `/auth/key` endpoint.
+  - Chose `openai/gpt-4o-mini` after querying OpenRouter's live model
+    catalog (346 models) and checking the key was real and funded ($5
+    limit, $0 used at the time) — cost turned out to be a total non-issue
+    at these prices (~$0.0002/call), so the model choice was driven by
+    NL2SQL format-reliability track record, not budget.
+  - **Vanna 2.0.2's API moved**: the classic `ChromaDB_VectorStore` +
+    `OpenAI_Chat` composition classes are no longer at `vanna.chromadb` /
+    `vanna.openai` — they're under `vanna.legacy.chromadb` /
+    `vanna.legacy.openai`. The top-level `vanna` package in 2.x is a full
+    agents/tools rewrite. Confirmed the legacy API's method surface
+    (`train`, `generate_sql`, `extract_sql`, `submit_prompt`) matches the
+    intended architecture exactly — a one-line import fix, not a design
+    problem.
+  - Vanna's built-in `OpenAI_Chat.submit_prompt` doesn't pass `max_tokens`
+    or expose `response.usage` — overridden on the `_TrainedVanna`
+    subclass in `services/nl2sql.py` to delegate to `services/llm.py`'s
+    `create_chat_completion` instead, which is also where per-instance
+    `code` overrides on `AppError` came from (`core/errors.py` gained an
+    optional `code` constructor kwarg so `LLMError` can carry either
+    `LLM_ERROR` or `LLM_UNAVAILABLE` without a new error class).
+  - OpenRouter's completion response includes an exact `usage.cost` field
+    — no per-model pricing table needed in `llm.py`, simpler than planned.
+  - `extract_sql` is reimplemented in `services/nl2sql.py` rather than
+    reusing Vanna's built-in version: ours raises `LLMError` when nothing
+    SQL-shaped is found at all (distinct from a guardrail block on
+    SQL-shaped-but-disallowed text), which Vanna's version doesn't
+    distinguish. Unit-tested in `tests/test_sql_extraction.py` (12 cases,
+    zero LLM calls) including a documented characterization: text
+    containing the ordinary English word "with" is not treated as "no
+    SQL" (extraction only checks for a keyword anywhere in the text) —
+    `core/guardrails.py`'s stricter "must START with SELECT/WITH" check is
+    what actually rejects that case.
+  - Overrode `_TrainedVanna.log()` as a no-op — `VannaBase.log()` does a
+    raw `print()` of the full prompt/response on every call, which isn't
+    in backend-spec.md §10's required log list and fights the "structured
+    JSON to stdout" requirement on every single request.
+  - Chroma's first-run ONNX embedding model download is ~79.3MB (matches
+    the ~80MB estimate); training after that cache is warm takes ~4s, well
+    inside the <15s target. **M11 note:** pre-bake `~/.cache/chroma` into
+    the Docker image, or accept one slow cold start on first deploy.
+  - 9 of 18 golden questions are composed from topic descriptions, not
+    verbatim assignment text (`docs/decisions.md`) — the assignment
+    document isn't in this repo.
+  - `GET /health` now reports `nl2sql_ready: bool` (extends the M3
+    envelope, doesn't change `/health`'s pass/fail semantics — that's
+    still DB-connectivity-only; `/query/sql` raises its own 503 if
+    generation is attempted before training completes).
+  - Rate limiting (10/min/IP) on `POST /query/sql` verified live: blocked
+    with a proper `RATE_LIMITED` envelope after ~9-10 requests in a tight
+    loop.

@@ -10,10 +10,17 @@ class AppError(Exception):
     status_code: int = 500
     code: str = "INTERNAL_ERROR"
 
-    def __init__(self, message: str, *, details: dict | None = None) -> None:
+    def __init__(
+        self, message: str, *, details: dict | None = None, code: str | None = None
+    ) -> None:
         super().__init__(message)
         self.message = message
         self.details = details
+        # Per-instance override, e.g. LLMError needs distinct codes for
+        # "unreachable/exhausted" (LLM_UNAVAILABLE) vs. other failures
+        # (the class default LLM_ERROR) without a new subclass per code.
+        if code is not None:
+            self.code = code
 
     def to_envelope(self) -> ErrorEnvelope:
         return ErrorEnvelope(

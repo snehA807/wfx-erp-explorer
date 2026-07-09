@@ -1,9 +1,9 @@
+from __future__ import annotations
+
 from pydantic import BaseModel, ConfigDict
 
 
-class HealthData(BaseModel):
+class GeneratedSqlResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    status: str
-    database: str
-    nl2sql_ready: bool
+    sql: str
