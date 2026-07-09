@@ -7,9 +7,9 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 the build at."
 
 **Last updated:** 2026-07-09
-**Current milestone:** M2 — Seed script + integrity gates
+**Current milestone:** M3 — FastAPI skeleton
 **Status:** ✅ Complete
-**Next milestone:** M3 — FastAPI skeleton
+**Next milestone:** M4 — Products/detail/filters endpoints
 
 ## Milestone status
 
@@ -18,7 +18,7 @@ the build at."
 | M0 | Repo scaffold & CLAUDE.md | 0 — Foundations | ✅ Complete |
 | M1 | DB schema + roles | 0 — Foundations | ✅ Complete |
 | M2 | Seed script + integrity gates | 0 — Foundations | ✅ Complete |
-| M3 | FastAPI skeleton | 1 — Backend core | ⬜ Not started |
+| M3 | FastAPI skeleton | 1 — Backend core | ✅ Complete |
 | M4 | Products/detail/filters endpoints | 1 — Backend core | ⬜ Not started |
 | M5 | Dashboard stats | 1 — Backend core | ⬜ Not started |
 | M6 | SQL guardrails + tests | 1 — Backend core | ⬜ Not started |
@@ -39,7 +39,7 @@ the build at."
 
 🔴 = red-flagged risk milestone (playbook.md).
 
-## Open items carried into M3
+## Open items carried into M4
 
 - `docs/backlog.md`: Docker Compose scope conflict (requirements.md vs.
   playbook.md) — still unresolved.
@@ -48,7 +48,17 @@ the build at."
   category, fabric, color, print, season, brand) since no source CSV column
   exists for it. Not a locked decision — safe to change before M9 embeds it,
   since re-running the seed script overwrites the column via upsert.
-- `scripts/requirements.txt` pins `psycopg[binary]` for `scripts/` only,
-  since `backend/`'s own dependency manifest doesn't exist until M3 — worth
-  folding into a shared manifest if M3 introduces one, rather than keeping
-  two.
+- ~~`scripts/requirements.txt` vs. a shared manifest~~ — resolved during M3:
+  kept separate on purpose. `backend/requirements.txt` now exists (full API
+  stack); merging would force anyone running just the seed script to install
+  FastAPI/uvicorn/slowapi/structlog for no reason.
+- `core/errors.py` gained a `ServiceUnavailableError` (503) not in
+  backend-spec.md §8's named list — needed for `/health` to honestly report
+  a DB outage instead of being forced into one of the six listed error
+  types. Flagging since it's an addition beyond the literal spec, not because
+  it seems likely to need reverting.
+- All Pydantic-model files in `backend/app/` use `from __future__ import
+  annotations` for PEP 604 (`X | None`) syntax support. Harmless on the
+  Python 3.11 deploy target; only exists to verify locally against this
+  machine's Python 3.9. Fine to remove once the dev machine/CI is on 3.11+
+  if it ever reads as clutter.

@@ -1,0 +1,15 @@
+# Every package here is already named in CLAUDE.md's fixed stack, or is the
+# minimum glue needed to run it (uvicorn as the ASGI server, pydantic-
+# settings for core/config.py). Nothing new is being introduced.
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+pydantic-settings>=2.4,<3
+psycopg[binary]>=3.1,<4
+structlog>=24.1,<25
+slowapi>=0.1.9,<1
+
+# CLAUDE.md pins Python 3.11 for deploy. On pre-3.10 interpreters, Pydantic
+# can't construct models using `X | None` syntax without this backport; it's
+# a no-op on 3.11+ but keeps `pip install -r requirements.txt` sufficient
+# for local dev on whatever Python is actually installed.
+eval_type_backport>=0.2,<1; python_version < "3.10"
