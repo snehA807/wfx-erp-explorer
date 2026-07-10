@@ -571,3 +571,160 @@ confirming root cause first):
    (hover cascades to ancestors), so the second check's "before"
    measurement was already mid-hover. Fixed by using two distinct cards
    for the two hover checks and moving the mouse to `(0, 0)` between them.
+
+## D-F45 — FilterRail's categorical-key vocabulary consolidated into one export (M12f)
+M12e had already produced a small duplication: `components/FilterRail.tsx`
+defined its own `CategoricalFilterKey`/`FIELDS`, and
+`pages/products/params.ts` independently redefined an identical
+`CategoricalFilterKey`/`CATEGORICAL_KEYS`. M12f's Search page needs the
+same six-field vocabulary a third time (`pages/search/params.ts`) — the
+point past which a third copy is worse than a small integration edit.
+Consolidated: `components/FilterRail.tsx` now exports `CATEGORICAL_FIELDS`
+(key + label) as the single source; both `pages/products/params.ts` and
+`pages/search/params.ts` derive their key list from it
+(`CATEGORICAL_FIELDS.map(f => f.key)`) instead of redefining it. No
+behavior change to Products — verified live (D-F44's follow-up run in
+D-F48 below). Also logged here (same D-F22/D-F28/D-F40 pattern): a new
+`--filter-rail-width: 260px` token (design-system.md §6: "Search: 260px
+filter rail + fluid results") and a `.grid-visual` utility (`auto-fill
+minmax(300px, 1fr)`, design-spec.md §4: "image-forward grid, larger
+tiles" — wider minimum than `.grid-products`'s 240px, same reasoning as
+that token: no fixed-breakpoint `grid-cols-*` utility can express
+`auto-fill`, so a named utility class rather than an arbitrary bracket
+value).
+
+`components/ui/slider.tsx` (shadcn primitive) also needed a real
+structural edit, not just a class tweak: it hardcoded exactly one
+`<SliderPrimitive.Thumb>`, which only supports a single-value slider.
+FilterRail's GSM control is a dual-range slider (design-system.md §10),
+which needs one `Thumb` per array entry in `value` — this is shadcn's own
+documented range-slider pattern (`value.map(...) => <Thumb />`), not a
+custom deviation. Edited to render `Array.from({length: value.length}).map(...)`;
+a length-1 value still renders exactly one thumb, so no existing/future
+single-value usage regresses.
+
+## D-F46 — DetailPanel open/close history logic extracted to `lib/hooks/useDetailPanelRoute.ts` (M12f)
+Products (M12e) built the `?style` push-on-open/`navigate(-1)`-on-close
+logic (D-F43) inline in its own page component. Search and Visual both
+need the identical behavior this milestone — three near-identical copies
+of ~20 lines of history-management logic is worse than extracting it
+once. `lib/hooks/useDetailPanelRoute.ts` is a mechanical extraction (same
+`openedRef`/`openDetail`/`closeDetail` shape, zero behavior change);
+Products was refactored to consume it instead of its own inline copy.
+Verified live post-refactor: opening/closing the Products DetailPanel via
+both the panel's own controls and the browser Back button still works
+identically (docs/frontend/decisions.md D-F44's own Products checks,
+re-run clean this milestone).
+
+## D-F47 — "Closest matches" fallback: a second, filter-free query capped at 2 (M12f)
+component-library.md's `EmptyState` documents a `closest?: product[]` prop
+for the `no-results` flavor; design-spec.md §9 specifies "2 nearest
+semantic matches." Implemented in `pages/search/useSearch.ts`: when the
+filtered query returns zero rows *and* at least one structured filter is
+active (`hasActiveSearchFilters`), a second `POST /search/products` call
+re-runs the same query text with `limit: 2` and no filters — the
+assumption being that the filters, not the query itself, caused the
+empty result. If no filters are active, `closest` stays `null` and
+`EmptyState` renders without the mini-grid (a query that matches nothing
+even unfiltered has no meaningful "closest" fallback to show beyond what
+was already the primary result set). Not built for Visual Search:
+`SearchVisualRequest` has no filter fields to blame, and the endpoint's
+`WHERE fg.text_embedding IS NOT NULL` clause matches effectively every
+row, making a genuine zero-result response unreachable in practice.
+Verified live: an over-constrained real filter combination (category +
+fabric) against production produced a real zero-result response, and the
+closest-matches mini-grid rendered with real product cards from an
+unfiltered re-query.
+
+`EmptyState` also gained an `onSelectClosest` callback (not explicitly
+named in component-library.md, but required to make the closest-matches
+cards clickable) and reuses `ProductCard` at `size="compact"` for the
+mini-grid — no new card component, same reuse-over-invention pattern as
+DetailPanel's "More like this" strip. `chips` (the `invite` flavor) is
+still deferred, per D-F37's original reasoning: `SuggestionChips` doesn't
+exist yet (M12g), and Ask's chips are the assignment's specific example
+NL2SQL questions, not applicable to a product-search invite state anyway.
+
+## D-F48 — Match-score badge threshold raised from D-F13's placeholder ~0.55 to 0.65, on real production data (M12f)
+implementation-plan.md's M12f Risk note calls this out explicitly: "tune
+threshold on real data during acceptance, note final value here."
+Measured live against the deployed backend (`POST /search/products`,
+BGE `text_embedding` cosine scores) across a deliberate range of query
+quality:
+- Pure nonsense (`"xyzzy quantum flavor 42"`): **0.59–0.60**
+- Off-topic but grammatical (`"the quick brown fox jumps"`, coincidentally
+  shares the word "brown" with several colors in the catalog): **0.53–0.54**
+- Single weak/generic keyword with one real signal (`"red something"`):
+  **0.62–0.65**
+- Single genuinely relevant keyword (`"cotton"`, `"garment"`): **0.72–0.76**
+- Descriptive, on-target queries (`"blue floral dress"`,
+  `"expensive jacket for winter"`): **0.72–0.83**
+
+D-F13's ~0.55 placeholder sits *inside* the nonsense-query band — shipping
+it as-is would badge random results for a garbage query as "58% match."
+0.65 sits cleanly between the weak/nonsense cluster (≤0.65) and every
+genuinely descriptive query tested (≥0.71), with no observed case landing
+in between. `MATCH_BADGE_THRESHOLD` is now a single exported constant in
+`components/ProductCard.tsx` (`components/ProductCard.tsx`'s own
+docstring carries this measurement summary) consumed by both `ProductCard`
+(Search) and `pages/visual/VisualTile.tsx` (Visual) — Visual reuses the
+same constant since `search_visual` also scores via
+`embed_query_text`/BGE, not CLIP (see below), so its score distribution
+is the same instrument.
+
+**Cross-reference, not a new finding**: `search_visual`
+(`backend/app/services/search.py`, `backend/app/db/queries/search.py`)
+matches queries against `text_embedding` via `embed_query_text` (BGE), not
+`image_embedding` via CLIP — already documented as the "M11 escape hatch"
+in `backend/app/db/queries/search.py`'s own comment and architecture.md
+§5 (CLIP OOMs Render's 512MB free tier alongside BGE + Chroma, confirmed
+live during M11). Noted here only because it's *why* D-F48's single
+threshold constant is safe to share between Search and Visual — both
+literally run the same scoring function server-side, just against
+different structured-filter surfaces. No frontend code changes as a
+result; flagging per CLAUDE.md's "flag conflicts instead of silently
+deviating" since the Visual screen's design intent ("natural-language
+query describing appearance") reads as CLIP-powered even though the
+backend (frozen, pre-existing) isn't.
+
+## D-F49 — M12f live verification method, and one harness bug found (not a product bug)
+Verified via a throwaway Playwright harness (M12b–M12e pattern — Chromium
+cached, reinstalled at the pinned revision, deleted after use) against
+the Vite dev server proxying the real production backend. **33/33 checks
+green** on the final run: Search's invite state before any query,
+300ms-debounced `?q` round-trip, real re-ranked results from
+`POST /search/products`, match badges present at the tuned threshold,
+facet checkbox groups with real counts from `GET /filters/options`,
+checking/unchecking a facet setting/clearing its URL param and pill, the
+GSM dual-range slider committing `min_gsm`/`max_gsm` on release (not on
+every drag tick), "Clear all" resetting everything, a genuine
+over-constrained-filter zero-result response rendering the closest-
+matches fallback + "Clear filters" action, DetailPanel reachable from a
+Search result card, FilterRail collapsing to a "Filters" Sheet-trigger
+below xl (tested at 1024px) with the same facet content inside; Visual's
+subtitle copy, invite state, debounced query, real results, the
+info-on-hover overlay (`opacity: 0` at rest, `1` on hover, verified via
+computed style) and DetailPanel reachability; 375px passes on both
+pages; a reduced-motion pass; and a regression check that Products'
+DetailPanel open/close still works identically after the D-F46 hook
+extraction, plus a full 8-route sweep (5 app routes + `/dev-tokens` +
+`/ask` + an unknown path) with zero real console errors.
+
+**One harness bug found and fixed mid-verification, not a product bug**
+(diagnosed with a standalone debug script before touching the
+verification code, per instruction not to guess-fix): the first pass
+simulated the GSM slider drag with raw `page.mouse.move/down/move/up`
+calls, which never registered as a valid drag against the Radix Slider
+thumb — likely imprecise pointer-event sequencing in headless automation,
+not a rendering issue. A standalone debug script confirmed the component
+itself was fine: it logged two real slider thumbs (dual-range render
+correct — D-F45) and that a **keyboard** interaction (`focus()` +
+`ArrowRight` × 10) correctly moved `aria-valuenow` and committed
+`min_gsm`/`max_gsm` to the URL immediately, matching `onValueCommit`'s
+documented key-up-commits behavior. Fixed the harness to drive the
+slider via keyboard instead of a simulated mouse drag — more reliable in
+headless automation regardless of the component under test. The GSM
+slider's downstream "Clear all" button check had also failed as a
+consequence (no active filters left to render the button once the GSM
+commit silently no-opped), confirming the failure was a single root
+cause, not two independent bugs.

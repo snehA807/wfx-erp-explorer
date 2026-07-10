@@ -268,3 +268,56 @@ export async function getFilterOptions(): Promise<FilterOptionsData> {
   const { data } = await request<FilterOptionsData>("/filters/options");
   return data;
 }
+
+// backend/app/models/requests/search.py — POST /search/products, /search/visual (M12f).
+export interface SearchProductsParams {
+  query: string;
+  limit?: number;
+  category?: string;
+  fabric?: string;
+  color?: string;
+  print?: string;
+  season?: string;
+  brand?: string;
+  supplier_id?: string;
+  min_price?: number;
+  max_price?: number;
+  min_gsm?: number;
+  max_gsm?: number;
+}
+
+export interface SearchVisualParams {
+  query: string;
+  limit?: number;
+}
+
+// backend/app/models/responses/search.py — ProductSummary + a similarity score.
+export interface SearchHit extends ProductSummary {
+  score: number;
+}
+
+function stripUndefined<T extends Record<string, unknown>>(params: T): Partial<T> {
+  const result: Partial<T> = {};
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== "") {
+      (result as Record<string, unknown>)[key] = value;
+    }
+  }
+  return result;
+}
+
+export async function searchProducts(params: SearchProductsParams): Promise<SearchHit[]> {
+  const { data } = await request<SearchHit[]>("/search/products", {
+    method: "POST",
+    body: JSON.stringify(stripUndefined(params as unknown as Record<string, unknown>)),
+  });
+  return data;
+}
+
+export async function searchVisual(params: SearchVisualParams): Promise<SearchHit[]> {
+  const { data } = await request<SearchHit[]>("/search/visual", {
+    method: "POST",
+    body: JSON.stringify(stripUndefined(params as unknown as Record<string, unknown>)),
+  });
+  return data;
+}

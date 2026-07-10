@@ -118,6 +118,8 @@ export default {
         // Shell-structural widths (m12c-contract.md §2, decisions.md D-F28).
         sidebar: "var(--sidebar-width)",
         rail: "var(--rail-width)",
+        // Search filter rail (design-system.md §6, decisions.md D-F45).
+        "filter-rail": "var(--filter-rail-width)",
       },
       borderRadius: {
         sm: "var(--radius-sm)",

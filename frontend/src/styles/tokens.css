@@ -133,6 +133,11 @@
      Logged in decisions.md D-F40. */
   --detail-panel-width: 480px;
 
+  /* Search filter rail width (design-system.md §6: "Search: 260px filter
+     rail + fluid results"). Same D-F22/D-F28/D-F40 pattern. Logged in
+     decisions.md D-F45 (M12f). */
+  --filter-rail-width: 260px;
+
   /* Mobile tab label (m12c-contract.md §4): 11px is named explicitly by
      navigation.md but isn't in the type scale (micro is 12px), so it earns
      its own token rather than an arbitrary Tailwind bracket value. Logged
@@ -435,6 +440,16 @@
   .grid-products {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: var(--space-4);
+  }
+
+  /* Visual Search's "image-forward grid, larger tiles" (design-spec.md §4)
+     — same auto-fill pattern as .grid-products, wider minimum so tiles read
+     larger. Named utility, not an arbitrary bracket value (M12f, decisions.md
+     D-F45). */
+  .grid-visual {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: var(--space-4);
   }
 

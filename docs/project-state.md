@@ -7,9 +7,9 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 the build at."
 
 **Last updated:** 2026-07-11
-**Current milestone:** M12e — Product Explorer (implementation-plan.md M12e section; no separate contract doc)
+**Current milestone:** M12f — Search + Visual Search (implementation-plan.md M12f section; no separate contract doc)
 **Status:** ✅ Complete
-**Next milestone:** M12f — Search + Visual Search
+**Next milestone:** M12g — AI Query (flagship)
 
 ## Milestone status
 
@@ -27,7 +27,7 @@ the build at."
 | M9 | Offline embeddings job | 1 — Backend core | ✅ Complete |
 | M10 | Search endpoints | 1 — Backend core | ✅ Complete |
 | M11 | Backend to production | 2 — Deploy early 🔴 | ✅ Complete |
-| M12 | Frontend foundation | 3 — Frontend | 🟡 In progress (M12a–M12e done) |
+| M12 | Frontend foundation | 3 — Frontend | 🟡 In progress (M12a–M12f done) |
 | M13 | Dashboard + Products screens | 3 — Frontend | ⬜ Not started |
 | M14 | Ask AI screen | 3 — Frontend | ⬜ Not started |
 | M15 | Search, Visual, Detail drawer | 3 — Frontend | ⬜ Not started |
@@ -624,3 +624,52 @@ the build at."
     `docs/frontend/decisions.md` D-F44.
   - `docs/frontend/decisions.md` gained D-F40–D-F44. Commit:
     `feat(frontend): M12e product explorer`.
+- **M12f (Search + Visual Search, implementation-plan.md's M12f section —
+  no separate contract doc):** `pages/search/{index,useSearch,params}.tsx`,
+  `pages/visual/{index,useVisualSearch,VisualTile}.tsx`,
+  `lib/api.ts` gained `searchProducts()`/`searchVisual()` + `SearchHit`/
+  `SearchProductsParams`/`SearchVisualParams` matching `backend/app/models/
+  {requests,responses}/search.py` exactly, `lib/hooks/useDetailPanelRoute.ts`
+  (extracted from Products, D-F46).
+  - `components/FilterRail.tsx` gained the `"full"` variant (M12e's plan
+    explicitly authorized this as an M12f "Files modified" target):
+    grouped checkbox facets with real counts, a GSM dual-range slider
+    (`onValueCommit`, not every drag tick), active pills (incl. a GSM
+    pill), collapsing to a "Filters" Sheet-trigger below xl (1280px).
+    `components/ui/slider.tsx` (shadcn primitive) needed a structural edit
+    to render one thumb per `value` entry — shadcn's own documented
+    range-slider pattern, not a deviation (D-F45).
+  - `components/ProductCard.tsx` gained an optional `matchScore` badge
+    (also explicitly plan-authorized); `components/EmptyState.tsx` gained
+    a `closest` prop + `onSelectClosest` for the `no-results` flavor's
+    "Closest matches" mini-grid (reuses `ProductCard` at `size="compact"`,
+    D-F47).
+  - `pages/products/params.ts` and the new `pages/search/params.ts` both
+    derive the six categorical-filter keys from `FilterRail.tsx`'s
+    `CATEGORICAL_FIELDS` export instead of each redefining the list
+    (D-F45) — the point at which a third independent copy would have been
+    worse than a small consolidating edit.
+  - **Real threshold correction, on real production data** (D-F48):
+    D-F13's placeholder match-badge threshold (~0.55) was measured live
+    and found to sit *inside* the score range a pure-nonsense query
+    produces (0.59–0.60) — shipping it as-is would have badged random
+    results as "58% match" on a garbage query. Raised to **0.65**, which
+    cleanly separates every nonsense/weak-keyword query tested (≤0.65)
+    from every genuinely descriptive query tested (≥0.71). `MATCH_BADGE_
+    THRESHOLD` is one exported constant in `ProductCard.tsx`, shared by
+    Search's `ProductCard` usage and Visual's `VisualTile` — both are
+    scored by the same backend function (`embed_query_text`/BGE), since
+    `search_visual` is the pre-existing M11 CLIP-OOM escape hatch
+    (architecture.md §5), not a new finding this milestone.
+  - `npm run build` clean, strict TS clean, grep acceptance check clean.
+  - **Verified live via a throwaway Playwright harness** (M12b–M12e
+    pattern, Chromium cached, deleted after use): **33/33 checks green**
+    against the Vite dev server proxying the real production backend —
+    full detail (including one harness bug found and fixed mid-
+    verification: a simulated mouse-drag on the Radix Slider thumb never
+    registered reliably in headless automation, fixed by driving it via
+    keyboard instead — confirmed with a standalone debug script that the
+    component itself was already correct) in `docs/frontend/decisions.md`
+    D-F49.
+  - `docs/frontend/decisions.md` gained D-F45–D-F49. Commit:
+    `feat(frontend): M12f search + visual search`.

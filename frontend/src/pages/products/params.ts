@@ -1,24 +1,22 @@
+import { CATEGORICAL_FIELDS, type CategoricalFilterKey } from "@/components/FilterRail";
 import type { ProductSortBy, SortOrder } from "@/lib/api";
 
 // navigation.md §2 route tree: /products ?page ?sort_by ?order ?category
 // ?fabric ?season ?color ?print ?min_gsm ?max_gsm ?supplier ?search ?style.
 // This milestone's toolbar doesn't expose GSM range (that's the FilterRail
-// full variant, M12f) or a supplier picker (GET /filters/options has no
-// supplier facet to populate one from — decisions.md D-F40), so those two
-// params are never produced by this UI. `search` has no backend
-// counterpart on GET /products (decisions.md D-F40) — it's a client-side
-// quick-filter over the fetched page, still URL-synced for round-trip.
+// full variant, M12f's Search page) or a supplier picker (GET
+// /filters/options has no supplier facet to populate one from — decisions.md
+// D-F40), so those two params are never produced by this UI. `search` has no
+// backend counterpart on GET /products (decisions.md D-F40) — it's a
+// client-side quick-filter over the fetched page, still URL-synced for
+// round-trip.
 
-export type CategoricalFilterKey = "category" | "fabric" | "color" | "print" | "season" | "brand";
+export type { CategoricalFilterKey };
 
-export const CATEGORICAL_KEYS: CategoricalFilterKey[] = [
-  "category",
-  "fabric",
-  "color",
-  "print",
-  "season",
-  "brand",
-];
+// Re-exported from FilterRail.tsx (the single source of truth for the 6
+// categorical fields, decisions.md D-F45) rather than redefined here —
+// pages/search/params.ts needs the identical list.
+export const CATEGORICAL_KEYS: CategoricalFilterKey[] = CATEGORICAL_FIELDS.map((field) => field.key);
 
 export type ProductsView = "grid" | "table";
 

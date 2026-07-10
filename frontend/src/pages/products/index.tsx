@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { LayoutGrid, Table2 } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import { DetailPanel } from "@/components/DetailPanel";
 import { EmptyState } from "@/components/EmptyState";
@@ -10,6 +10,7 @@ import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useDetailPanelRoute } from "@/lib/hooks/useDetailPanelRoute";
 import { useFilterOptions } from "@/lib/hooks/useFilterOptions";
 
 import { Pagination } from "./Pagination";
@@ -23,15 +24,10 @@ export default function ProductsPage() {
   }, []);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const params = useMemo(() => parseProductsParams(searchParams), [searchParams]);
   const { items, meta, loading, error, retry } = useProducts(params);
   const { facets } = useFilterOptions();
-
-  // True once this page itself has pushed a `?style` entry — lets the panel's
-  // close control (X, Esc, overlay, browser Back) all take the same path:
-  // one step back in history, which is what actually restores scroll.
-  const openedDetailRef = useRef(false);
+  const { styleNumber: styleParam, openDetail, closeDetail } = useDetailPanelRoute();
 
   const [searchInput, setSearchInput] = useState(params.search);
   useEffect(() => {
@@ -58,24 +54,6 @@ export default function ProductsPage() {
     setSearchParams(next, { replace: true });
   }
 
-  function openDetail(styleNumber: string) {
-    const next = new URLSearchParams(searchParams);
-    next.set("style", styleNumber);
-    openedDetailRef.current = true;
-    setSearchParams(next);
-  }
-
-  function closeDetail() {
-    if (openedDetailRef.current) {
-      navigate(-1);
-    } else {
-      const next = new URLSearchParams(searchParams);
-      next.delete("style");
-      setSearchParams(next, { replace: true });
-    }
-    openedDetailRef.current = false;
-  }
-
   // No backend `search` param exists on GET /products (decisions.md D-F40)
   // — this narrows the already-fetched page client-side.
   const visibleItems = useMemo(() => {
@@ -98,7 +76,6 @@ export default function ProductsPage() {
 
   const hasActiveNarrowing = Object.keys(activeFilters).length > 0 || params.search.length > 0;
   const sortValue = `${params.sort_by}:${params.order}`;
-  const styleParam = searchParams.get("style");
 
   return (
     <>
