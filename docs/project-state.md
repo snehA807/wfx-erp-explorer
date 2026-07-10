@@ -7,9 +7,9 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 the build at."
 
 **Last updated:** 2026-07-10
-**Current milestone:** M9 — Offline embeddings job
+**Current milestone:** M10 — Search endpoints
 **Status:** ✅ Complete
-**Next milestone:** M10 — Search endpoints
+**Next milestone:** M11 — Backend to production
 
 ## Milestone status
 
@@ -25,7 +25,7 @@ the build at."
 | M7 | Vanna + training package | 1 — Backend core 🔴 | ✅ Complete |
 | M8 | /query SSE pipeline | 1 — Backend core | ✅ Complete |
 | M9 | Offline embeddings job | 1 — Backend core | ✅ Complete |
-| M10 | Search endpoints | 1 — Backend core | ⬜ Not started |
+| M10 | Search endpoints | 1 — Backend core | ✅ Complete |
 | M11 | Backend to production | 2 — Deploy early 🔴 | ⬜ Not started |
 | M12 | Frontend foundation | 3 — Frontend | ⬜ Not started |
 | M13 | Dashboard + Products screens | 3 — Frontend | ⬜ Not started |
@@ -291,3 +291,59 @@ the build at."
     (a deliberately-invalid URL), not against a real transient failure —
     flagged in `docs/decisions.md`, not re-tested further since the real
     run had nothing to retry.
+- **M10 (Search endpoints, `POST /search/products` + `POST /search/visual`):**
+  `services/embeddings.py` (lazy `TextEmbedding`/CLIP-text singletons,
+  `functools.lru_cache`-wrapped `embed_query_text`/`embed_query_visual`,
+  `ServiceUnavailableError` on model download/init failure),
+  `services/search.py`, `db/queries/search.py` (SQL builders reusing
+  `products.py`'s `build_where_clause`/`_LIST_COLUMNS`/`_LIST_FROM`
+  verbatim), `models/requests/search.py`, `models/responses/search.py`
+  (`SearchHit(ProductSummary)` + `score`), `routers/search.py` (two thin
+  30/min-rate-limited POST routes). `GET /products/{style}/similar` (M9)
+  untouched, per plan — M10 was net-new endpoints only.
+  - **Blocker found and fixed (approved before applying, full detail in
+    `docs/decisions.md`):** `core/config.py`'s `Settings` inherited
+    pydantic-settings' default `extra="forbid"`, so it choked on
+    `DATABASE_URL_OWNER` (added to `backend/.env` in M9) and the FastAPI
+    app couldn't boot at all — pre-existing since M9, invisible until M10
+    needed to actually start `uvicorn`/`TestClient` for the first time
+    since then. Fixed with one line (`extra="ignore"`).
+  - Step-1 dependency proof (M9's pattern) run before any implementation:
+    `Qdrant/clip-ViT-B-32-text` confirmed live in fastembed 0.7.4's
+    `list_supported_models()`, 512d output, norm ≈ 1.0, and a matching
+    text query scored meaningfully higher cosine similarity (0.334) than
+    an unrelated one (0.175) against a real `image_embedding` — the CLIP
+    pairing locked in M9 produces a real cross-modal signal, not just
+    matching dimensions.
+  - Smallest-possible refactor to satisfy the plan's reuse requirement:
+    `services/products.py::_validate_categorical_filters`/
+    `_row_to_summary` renamed to `validate_categorical_filters`/
+    `row_to_summary` (dropped leading underscore) with the former's
+    parameter generalized to a `Protocol`, so `services/search.py` imports
+    both verbatim — no behavior change, one call site updated.
+  - `tests/test_search_api.py`: 13 new contract-level tests (envelope
+    shape, score-descending ordering, `meta.count`, empty query,
+    unknown/extra body field, limit out of range, unknown categorical
+    filter value with `{field, value}` details, `min_price > max_price`,
+    score-math unit test, visual request rejecting filter fields, 503 on
+    embedding failure) — zero model downloads, zero DB: `TestClient(app)`
+    used without the `with`-context form never triggers FastAPI's
+    lifespan (verified directly), so `get_nl2sql_service().train()` is
+    never called; DB and embedding calls are monkeypatched at the
+    `app.services.search` module level. Full suite: 78 passed (65 prior +
+    13 new) in ~1.2s.
+  - Live verification against real Supabase, all green (full detail in
+    `docs/decisions.md`): a semantic hybrid query ("blue floral dress")
+    returned score-descending, category-correct results; adding
+    `category="Polo"` correctly constrained every hit; a visual query ("a
+    dark garment with stripes") surfaced dark/patterned garments (CLIP
+    match quality on product photos is fuzzy as the plan anticipated, but
+    directionally right); an over-constrained filter combination returned
+    an honest empty list; a product's own `search_text` fed back as the
+    query ranked that exact product #1 with `score: 1.0`; a 32-request
+    burst against `/search/products` passed exactly 30 then hit
+    `RATE_LIMITED` on the 31st/32nd, while `/search/visual`'s independent
+    per-route bucket was unaffected.
+  - `core/guardrails.py`/`tests/test_guardrails.py` untouched — CLAUDE.md
+    invariant 6 not triggered, no guardrail-relevant change in this
+    milestone.

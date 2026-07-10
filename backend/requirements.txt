@@ -31,3 +31,8 @@ openai==2.45.0
 # Direct dependency now (services/nl2sql.py parses golden_queries.yaml)
 # rather than just a transitive one pulled in by vanna/chromadb.
 PyYAML==6.0.3
+
+# M10 (docs/decisions.md): runtime query-side embedding for /search/*.
+# Already named in CLAUDE.md's fixed stack and already proven installed in
+# backend/.venv from M9's dependency proof — not a new dependency decision.
+fastembed>=0.7,<0.8

@@ -19,7 +19,7 @@ from app.core.errors import AppError
 from app.core.rate_limit import limiter
 from app.db.session import close_connection
 from app.models.responses.envelope import ErrorDetail, ErrorEnvelope
-from app.routers import dashboard, meta, products, query
+from app.routers import dashboard, meta, products, query, search
 from app.services.nl2sql import get_nl2sql_service
 
 structlog.configure(
@@ -134,3 +134,4 @@ app.include_router(meta.router, prefix="/api/v1")
 app.include_router(products.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 app.include_router(query.router, prefix="/api/v1")
+app.include_router(search.router, prefix="/api/v1")

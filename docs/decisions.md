@@ -135,3 +135,48 @@ the whole `/query*` prefix backend-spec.md §3's table notation might
 imply. Not changed here: this is M7's existing pattern (slowapi's default
 per-endpoint scoping), and building a cross-route shared-limit key is a
 bigger call than a same-session M8 fix should make unilaterally.
+
+2026-07-10 — M10 — Blocker found and fixed before any M10 code could be
+exercised: `core/config.py`'s `Settings` (via `SettingsConfigDict(env_file=
+".env")`) inherited pydantic-settings' default `extra="forbid"`, so
+`Settings()` construction has been raising a `ValidationError` on
+`DATABASE_URL_OWNER` (added to `backend/.env` in M9 for `scripts/`, read
+via `os.environ` directly, never through this class — the docstring
+already documented it as "deliberately absent") ever since. This meant the
+FastAPI app could not boot at all (confirmed: `uvicorn`/`from app.routers
+import query` both failed identically) — pre-existing since M9, invisible
+until now because M9 only ran a standalone script and the existing test
+suite never imports `main.py` or a router module. Fixed with a one-line
+`extra="ignore"` on `Settings.model_config`, approved before applying.
+Unblocked M10's own `TestClient` contract tests and live `uvicorn`
+verification; every prior milestone's live testing predates this
+regression and is unaffected.
+
+2026-07-10 — M10 — Confirmed `Qdrant/clip-ViT-B-32-text` (fastembed
+0.7.4) live before writing any implementation code: 512d output, norm ≈
+1.0, and a matching text query ("plum colored shorts, solid") scored
+0.334 cosine similarity against a real `image_embedding` for that exact
+product vs. 0.175 for an unrelated query — confirms the CLIP text/vision
+pairing locked in M9 actually produces a meaningful cross-modal signal,
+not just matching dimensions.
+
+2026-07-10 — M10 — `services/products.py::_validate_categorical_filters`
+and `_row_to_summary` were renamed to `validate_categorical_filters` and
+`row_to_summary` (dropped the leading underscore) and the former's
+parameter type generalized to a `Protocol` (`CategoricalFilterParams`)
+matching the six shared filter fields, so `services/search.py` imports
+and reuses both verbatim instead of duplicating them — mechanical rename,
+no behavior change, only call site updated is `list_products`.
+
+2026-07-10 — M10 — Live verification against real Supabase, all green:
+hybrid query ("blue floral dress") returned semantically relevant, score-
+descending results; adding `category="Polo"` correctly constrained every
+result to that category; visual query ("a dark garment with stripes")
+surfaced dark/patterned garments (CLIP-text-on-product-photos match
+quality is fuzzy as anticipated, but directionally correct); a filter
+combination excluding every row returned an honest `{"data":[],"meta":
+{"count":0}}`; feeding a product's own `search_text` back as the query
+ranked that exact product #1 with `score: 1.0`; a 32-request burst against
+`/search/products` passed exactly 30 then returned `RATE_LIMITED` (429)
+on the 31st and 32nd, while `/search/visual` was unaffected (independent
+per-route bucket, same pattern as M8's `/query*`).

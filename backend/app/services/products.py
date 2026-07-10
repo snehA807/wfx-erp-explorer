@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Protocol
+
 from app.core.errors import NotFoundError, ValidationError
 from app.db.queries import products as product_queries
 from app.db.session import get_connection
@@ -15,9 +17,23 @@ from app.services.filters import get_filter_options
 _CATEGORICAL_FILTERS = ("category", "fabric", "color", "print", "season", "brand")
 
 
-def _validate_categorical_filters(params: ProductListParams) -> None:
+class CategoricalFilterParams(Protocol):
+    """Structural type for anything carrying the six categorical filter
+    fields — satisfied by both ProductListParams and
+    SearchProductsRequest (M10) without either inheriting from the other."""
+
+    category: str | None
+    fabric: str | None
+    color: str | None
+    print: str | None
+    season: str | None
+    brand: str | None
+
+
+def validate_categorical_filters(params: CategoricalFilterParams) -> None:
     """backend-spec.md §9 tier 2: filter values checked against cached
-    facet sets, not just shape."""
+    facet sets, not just shape. Generalized in M10 so services/search.py
+    reuses this verbatim instead of duplicating it."""
     options = get_filter_options()
     facets = {
         "category": options.category,
@@ -39,7 +55,7 @@ def _validate_categorical_filters(params: ProductListParams) -> None:
             )
 
 
-def _row_to_summary(row: tuple) -> ProductSummary:
+def row_to_summary(row: tuple) -> ProductSummary:
     return ProductSummary(
         style_number=row[0],
         style_name=row[1],
@@ -58,7 +74,7 @@ def _row_to_summary(row: tuple) -> ProductSummary:
 
 
 def list_products(params: ProductListParams) -> tuple[list[ProductSummary], int]:
-    _validate_categorical_filters(params)
+    validate_categorical_filters(params)
 
     filters = {
         "category": params.category,
@@ -92,7 +108,7 @@ def list_products(params: ProductListParams) -> tuple[list[ProductSummary], int]
         )
         rows = cur.fetchall()
 
-    return [_row_to_summary(row) for row in rows], total
+    return [row_to_summary(row) for row in rows], total
 
 
 def get_product_detail(style_number: str) -> ProductDetailData:
@@ -164,4 +180,4 @@ def get_similar_products(style_number: str, limit: int) -> list[ProductSummary]:
         )
         rows = cur.fetchall()
 
-    return [_row_to_summary(row) for row in rows]
+    return [row_to_summary(row) for row in rows]

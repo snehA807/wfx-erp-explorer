@@ -10,7 +10,11 @@ class Settings(BaseSettings):
     VITE_API_BASE_URL are read by scripts/ and the frontend respectively,
     never by this process, so they are deliberately absent here."""
 
-    model_config = SettingsConfigDict(env_file=".env")
+    # extra="ignore": pydantic-settings defaults to extra="forbid", which
+    # broke app boot once backend/.env gained DATABASE_URL_OWNER (M9, read
+    # directly by scripts/ via os.environ, never through this class) — found
+    # as a blocker during M10 live-verification prep (docs/decisions.md).
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str
     openrouter_api_key: str
@@ -23,6 +27,7 @@ class Settings(BaseSettings):
     # Parsing it ourselves in cors_origin_list sidesteps that entirely.
     cors_origins: str
     rate_limit_query: str = "10/minute"
+    rate_limit_search: str = "30/minute"
     env: str = "development"
 
     @property
