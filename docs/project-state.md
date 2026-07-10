@@ -7,9 +7,9 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 the build at."
 
 **Last updated:** 2026-07-10
-**Current milestone:** M12a — Frontend project foundation (docs/frontend/implementation-plan.md)
+**Current milestone:** M12c — Layout shell (docs/frontend/m12c-contract.md)
 **Status:** ✅ Complete
-**Next milestone:** M12b — Design system (tokens layer)
+**Next milestone:** M12d — Overview (Dashboard)
 
 ## Milestone status
 
@@ -27,7 +27,7 @@ the build at."
 | M9 | Offline embeddings job | 1 — Backend core | ✅ Complete |
 | M10 | Search endpoints | 1 — Backend core | ✅ Complete |
 | M11 | Backend to production | 2 — Deploy early 🔴 | ✅ Complete |
-| M12 | Frontend foundation | 3 — Frontend | 🟡 In progress (M12a done) |
+| M12 | Frontend foundation | 3 — Frontend | 🟡 In progress (M12a–M12c done) |
 | M13 | Dashboard + Products screens | 3 — Frontend | ⬜ Not started |
 | M14 | Ask AI screen | 3 — Frontend | ⬜ Not started |
 | M15 | Search, Visual, Detail drawer | 3 — Frontend | ⬜ Not started |
@@ -383,3 +383,127 @@ the build at."
     (GHSA-67mh-4wv8-2f99); fixing it means jumping to `vite@8`, a breaking
     major bump out of scope for this milestone and a call for the requester,
     not made unilaterally. Dev-only; does not affect production build output.
+- **M12b (Design system / tokens layer, `docs/frontend/m12b-contract.md`):**
+  `styles/tokens.css` (5 regions per the contract), Tailwind 3.4.x mapping
+  layer (`tailwind.config.js`, `theme.extend` only, every value a `var()`
+  reference), shadcn CLI vendored into `components/ui/*` (Button, Input,
+  Textarea, Select, Checkbox, Slider, Sheet, Dialog, Command, Table, Badge,
+  Skeleton, Tooltip, Toast, Tabs — 15 primitives per component-library.md
+  §1), the four foundation primitives (`Seam`, `SeamProgress`, `PageTitle`,
+  `StatusDot`), `lib/theme.ts` (`.inset`/`data-surface` contract, z-index
+  names, `usePrefersReducedMotion`), and the `/dev-tokens` QA route (10
+  sections per contract §12).
+  - New deps: `tailwindcss@3.4.14`/`postcss`/`autoprefixer`,
+    `@fontsource/inter`+`@fontsource/jetbrains-mono` (self-hosted, no CDN),
+    shadcn's peer utilities (`clsx`, `tailwind-merge`,
+    `class-variance-authority`, `lucide-react`) and Radix primitives pulled
+    in by the vendored components — all pre-sanctioned by the contract §11.
+  - `@/*` path alias added (`tsconfig.app.json`/`tsconfig.json`/
+    `vite.config.ts`) for the shadcn CLI's expected `@/components`/`@/lib`
+    aliases — not used elsewhere in the codebase, which keeps its existing
+    relative-import style.
+  - Verified live via a throwaway Playwright harness (Chromium installed via
+    `npx playwright install`, not a project dependency — deleted after use,
+    same pattern as D-F21's Node harness): full `/dev-tokens` screenshot
+    pass of all 10 sections, zero console errors; SeamProgress state
+    stepper (idle/stitching ¼-¾/complete/error×2) driven live; contrast
+    ratios measured from real computed DOM colors (not hand-typed hex),
+    `usePrefersReducedMotion` + `prefers-reduced-motion` emulation confirmed
+    (durations collapse to 0.01ms, card-hover lift/shadow vanish, marching
+    stitch animation doesn't mount); keyboard-tab focus ring confirmed on
+    both a plain link (global `outline`) and a shadcn Button (Tailwind
+    `ring` utility) on both palettes; all five existing routes + `/ask` +
+    an unknown path re-smoke-tested for regressions (zero console errors).
+  - **Three real bugs found and fixed during live verification** (full
+    detail in `docs/frontend/decisions.md` D-F23–D-F25): (1) the shadcn
+    bridge redeclared `--border`/`--ring`/`--accent` under the same names
+    Region 1 already used, producing a circular `var()` reference that
+    silently broke `--accent` (measured live: `accent-ink` on `accent`
+    scored 1.77:1 instead of ~9:1) — fixed by dropping the redundant/dead
+    `--border`/`--ring`/`--radius` re-bridges and renaming shadcn's internal
+    hover-chrome color to `--chrome`/`--chrome-foreground` so "accent" keeps
+    one meaning (our sanctioned lime). (2) `.inset` only redefined CSS
+    variables, not `color`/`background-color` themselves, so unstyled text
+    inside an inset subtree kept its inherited light-mode color
+    (dark-on-dark) — fixed by declaring both directly on `.inset`. (3) the
+    reduced-motion override for `.card-hover:hover` was plain CSS while the
+    rule it overrides is Tailwind-layered (`@layer utilities`), and Tailwind
+    v3's `@layer` is a build-time relocation, not the native cascade-layers
+    at-rule — the override kept its early physical position and lost;
+    wrapping it in `@layer utilities` too fixed it.
+  - **One conflict flagged, not fixed** (`docs/frontend/decisions.md`
+    D-F26): design-system.md §1's own 4.5:1 text-contrast floor is not met
+    by its own locked `success`/`warning`/`danger` hexes on their `-soft`
+    tint backgrounds (measured live: 3.20:1 / 3.04:1 / 4.36:1). Hex values
+    used exactly as locked per CLAUDE.md; needs a requester call before M12d
+    (status Badge) consumes these as text-on-tint.
+  - Two tokens added beyond design-system.md's literal enumeration
+    (`docs/frontend/decisions.md` D-F22): `--ring` (derived — design-system
+    specifies the constraint, not the value) and `--space-title-bottom` /
+    `--content-max-width` (design-system names exact px values that don't
+    fit the 4px scale).
+  - Vendored shadcn files got class-level-only edits (contract §7): shadow
+    tokens aligned to the 3-token elevation system (removed from static
+    controls, `shadow-lg`/`-md` → `shadow-float` on floating surfaces), and
+    `badge.tsx` gained `success`/`warning`/`danger` variants for M12d
+    (`docs/frontend/decisions.md` D-F27).
+  - Grep acceptance check (contract §13.2) clean: zero raw hex/arbitrary
+    bracket values/`shadow-[`/raw duration literals in `src/` outside
+    `styles/tokens.css` and `components/ui/`.
+- **M12c (Layout shell, `docs/frontend/m12c-contract.md`):**
+  `components/shell/{AppShell,Sidebar,MobileTabs,ColdStartBanner}.tsx`,
+  `StatusDot.tsx` gained a `compact` presentation prop, `useHealth.ts`'s
+  degraded/down split (§5), three new tokens (`--sidebar-width`,
+  `--rail-width`, `--text-tab-*`) plus a `.pb-safe-bottom` utility in
+  `tokens.css`, `tailwind.config.js` width mappings, `router.tsx`'s new
+  AppShell layout route wrapping the five app routes (`/dev-tokens` stays
+  outside per the contract), and PageTitle blocks on all five placeholder
+  pages. Full detail on the three added tokens, the StatusDot/pb-safe
+  class-level edits, the health-mapping fix, and the Ask-resting-edge
+  extension to MobileTabs in `docs/frontend/decisions.md` D-F28–D-F31.
+  - Sidebar/rail is one component with two responsive presentations
+    (Tailwind `md`/`xl` breakpoints only, no JS media queries): 232px full
+    sidebar above 1280px, 64px icon-only rail 768–1280px with labels
+    moved into shadcn Tooltips (`aria-label` still carries the accessible
+    name), bottom tabs below 768px. Icon sizing (18px per
+    design-system.md §7) uses lucide-react's `size` prop rather than a
+    Tailwind class, so no arbitrary bracket value or extra token was
+    needed for it.
+  - ColdStartBanner's session-once gate lives in AppShell: a ref reads
+    `sessionStorage` once at mount (not state, so it can't race the first
+    `isSlow` transition); the banner shows only while `triggered &&
+    health === null && !dismissed` — `health` is only ever set on a
+    *successful* `/health` response, so `health === null` doubles as "the
+    pending check hasn't resolved successfully yet," which is what makes
+    the banner auto-hide the moment it does, per the contract's exact
+    wording, without needing any change to `useHealth`'s public shape.
+  - **Verified live via a throwaway Playwright harness** (Chromium
+    already cached from M12b, installed as a `--no-save` dependency in
+    the scratchpad, not a project dependency — deleted after use, same
+    pattern as D-F21/M12b): 56/56 checks green, run against the real
+    production backend (`https://wfx-erp-explorer.onrender.com`) on the
+    Vite dev server. Covered: 1440/1024/375px breakpoint pass + resize
+    reflow across both boundaries; `aria-current` and the accent
+    edge/tint correct on all five routes in all three presentations,
+    including Ask's resting edge (verified faint-but-present on all three
+    presentations, not just the sidebar — see D-F31); StatusDot live
+    (real green pulse against production `/health`), degraded (mocked 503
+    envelope) and down (aborted request) via Playwright route
+    interception; ColdStartBanner appearing verbatim after a gated >3s
+    `/health` response, auto-hiding on resolution, surviving navigation
+    and reload without reappearing (same `sessionStorage` flag), and a
+    fresh browser context showing it's eligible again; keyboard tab
+    order + visible focus ring on nav items + non-trapping rail tooltips
+    on focus; the D-F21 carry-over (`/ask` and an unknown path both
+    redirecting to `/`, this time genuinely interactive since a headless
+    browser was available); reduced-motion emulation collapsing the nav
+    hover transition and the status-dot pulse to ~0; zero console errors
+    across all five routes at all three widths.
+  - **One test-harness-only issue found, not a product bug:** the
+    backend's CORS allow-list rejects any dev origin other than Vite's
+    default `http://localhost:5173` — the harness's first pass ran the
+    dev server on port 5183 (chosen only to avoid a port clash) and every
+    live-backend check silently degraded to "Offline" via a CORS-shaped
+    network failure. Confirmed directly with a manual `OPTIONS`
+    preflight (`Disallowed CORS origin`) before re-running the whole
+    harness against port 5173, where every check passed cleanly.

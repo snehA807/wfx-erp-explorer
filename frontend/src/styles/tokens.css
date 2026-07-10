@@ -121,6 +121,21 @@
      1320, centered"). Logged in decisions.md D-F22. */
   --content-max-width: 1320px;
 
+  /* Shell-structural constants (m12c-contract.md §2): 232px/64px are named
+     in navigation.md's prose but never assigned a variable there — same
+     D-F22 pattern, not design-system spacing values. Logged in
+     decisions.md D-F28. */
+  --sidebar-width: 232px;
+  --rail-width: 64px;
+
+  /* Mobile tab label (m12c-contract.md §4): 11px is named explicitly by
+     navigation.md but isn't in the type scale (micro is 12px), so it earns
+     its own token rather than an arbitrary Tailwind bracket value. Logged
+     in decisions.md D-F28. */
+  --text-tab-size: 11px;
+  --text-tab-weight: 500;
+  --text-tab-lh: 1.2;
+
   /* radius (design-system.md §5) */
   --radius-sm: 6px;
   --radius: 8px;
@@ -206,6 +221,15 @@
     font-family: var(--font-mono);
     font-size: var(--text-mono-size);
     font-weight: var(--text-mono-weight);
+  }
+  /* Mobile tab label (m12c-contract.md §4) — not one of the eight
+     design-system.md type roles; composed the same way as the others so
+     app code never hand-stacks raw font utilities. */
+  .text-role-tab {
+    font-family: var(--font-sans);
+    font-size: var(--text-tab-size);
+    font-weight: var(--text-tab-weight);
+    line-height: var(--text-tab-lh);
   }
 }
 
@@ -412,6 +436,14 @@
   .cascade-item {
     animation: fade-rise var(--dur-slow) var(--ease-out-app) both;
     animation-delay: calc(var(--cascade-index, 0) * 30ms);
+  }
+
+  /* MobileTabs safe-area clearance (m12c-contract.md §4): home-indicator
+     devices need real bottom inset, not a fixed px guess — env() has no
+     Tailwind utility, so it lives here rather than as an arbitrary
+     bracket value in component code. */
+  .pb-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   .caret-blink {

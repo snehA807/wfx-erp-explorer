@@ -112,6 +112,11 @@ export default {
       maxWidth: {
         content: "var(--content-max-width)",
       },
+      width: {
+        // Shell-structural widths (m12c-contract.md §2, decisions.md D-F28).
+        sidebar: "var(--sidebar-width)",
+        rail: "var(--rail-width)",
+      },
       borderRadius: {
         sm: "var(--radius-sm)",
         DEFAULT: "var(--radius)",

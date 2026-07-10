@@ -4,6 +4,9 @@ export type StatusDotStatus = "live" | "degraded" | "down";
 
 export interface StatusDotProps {
   status: StatusDotStatus;
+  /** Rail presentation (m12c-contract.md §3): dot only, label screen-reader-
+   * only — the full label surfaces via an enclosing Tooltip instead. */
+  compact?: boolean;
   className?: string;
 }
 
@@ -18,12 +21,12 @@ const STATUS_CONFIG: Record<StatusDotStatus, { label: string; colorClass: string
  * The dot is decorative (aria-hidden) — the text label is what carries
  * state, never color alone (design principle #6, m12b-contract.md §10).
  */
-export function StatusDot({ status, className }: StatusDotProps) {
+export function StatusDot({ status, compact, className }: StatusDotProps) {
   const { label, colorClass, pulse } = STATUS_CONFIG[status];
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
       <span aria-hidden="true" className={cn("h-1.5 w-1.5 rounded-full", colorClass, pulse && "dot-pulse")} />
-      <span className="text-role-small text-text-2">{label}</span>
+      <span className={cn("text-role-small text-text-2", compact && "sr-only")}>{label}</span>
     </span>
   );
 }

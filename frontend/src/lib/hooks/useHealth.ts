@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { getHealth, type HealthResponse } from "../api";
+import { ApiError, getHealth, type HealthResponse } from "../api";
 
 export type HealthStatus = "live" | "degraded" | "down";
 
@@ -26,8 +26,13 @@ export function useHealth(): UseHealthResult {
       const result = await getHealth();
       setHealth(result);
       setStatus(result.status === "ok" ? "live" : "degraded");
-    } catch {
-      setStatus("down");
+    } catch (err) {
+      // m12c-contract.md §5: an ApiError with a real HTTP status means the
+      // backend was reachable and answered (e.g. the 503 envelope /health
+      // returns on a DB outage) — that's "degraded", not "down". Only a
+      // network-level failure (ApiError.status === null, set by api.ts's
+      // fetch-rejection branch) means the backend is truly unreachable.
+      setStatus(err instanceof ApiError && err.status !== null ? "degraded" : "down");
     } finally {
       if (slowTimer) clearTimeout(slowTimer);
       hasCheckedOnce.current = true;

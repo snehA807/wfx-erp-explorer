@@ -1,6 +1,8 @@
 import { lazy, Suspense } from "react";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 
+import { AppShell } from "../components/shell/AppShell";
+
 const AskPage = lazy(() => import("../pages/ask"));
 const OverviewPage = lazy(() => import("../pages/overview"));
 const ProductsPage = lazy(() => import("../pages/products"));
@@ -18,11 +20,19 @@ function withSuspense(Element: React.LazyExoticComponent<() => JSX.Element>) {
 }
 
 const router = createBrowserRouter([
-  { path: "/", element: withSuspense(AskPage) },
-  { path: "/overview", element: withSuspense(OverviewPage) },
-  { path: "/products", element: withSuspense(ProductsPage) },
-  { path: "/search", element: withSuspense(SearchPage) },
-  { path: "/visual", element: withSuspense(VisualSearchPage) },
+  {
+    element: <AppShell />,
+    children: [
+      { path: "/", element: withSuspense(AskPage) },
+      { path: "/overview", element: withSuspense(OverviewPage) },
+      { path: "/products", element: withSuspense(ProductsPage) },
+      { path: "/search", element: withSuspense(SearchPage) },
+      { path: "/visual", element: withSuspense(VisualSearchPage) },
+    ],
+  },
+  // /dev-tokens stays outside the shell (m12c-contract.md §1): a QA
+  // instrument, never linked from nav — wrapping it would put throwaway
+  // content inside the production frame for no verification benefit.
   { path: "/dev-tokens", element: withSuspense(DevTokensPage) },
   { path: "/ask", element: <Navigate to="/" replace /> },
   { path: "*", element: <Navigate to="/" replace /> },
