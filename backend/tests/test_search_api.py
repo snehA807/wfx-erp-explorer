@@ -90,14 +90,14 @@ class _FakeConnection:
 
 @pytest.fixture(autouse=True)
 def _clear_lru_caches() -> None:
-    # embed_query_text/embed_query_visual are functools.lru_cache-wrapped;
-    # clear between tests so monkeypatched raises/returns don't leak via a
-    # cached result from an earlier test using the same query string.
+    # embed_query_text is functools.lru_cache-wrapped; clear between tests
+    # so monkeypatched raises/returns don't leak via a cached result from an
+    # earlier test using the same query string. search_visual also calls
+    # embed_query_text since the M11 escape hatch (architecture.md §5) moved
+    # it off CLIP's embed_query_visual (OOMs Render's 512MB free tier).
     search_service.embed_query_text.cache_clear()
-    search_service.embed_query_visual.cache_clear()
     yield
     search_service.embed_query_text.cache_clear()
-    search_service.embed_query_visual.cache_clear()
 
 
 class TestSearchProducts:
@@ -185,7 +185,7 @@ class TestSearchProducts:
 class TestSearchVisual:
     def test_valid_visual_request(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(
-            search_service, "embed_query_visual", lambda query: "[0.3,0.4]"
+            search_service, "embed_query_text", lambda query: "[0.3,0.4]"
         )
         monkeypatch.setattr(
             search_service,
@@ -218,7 +218,7 @@ class TestSearchVisual:
         def _raise(query: str) -> str:
             raise ServiceUnavailableError("Search is warming up or unavailable")
 
-        monkeypatch.setattr(search_service, "embed_query_visual", _raise)
+        monkeypatch.setattr(search_service, "embed_query_text", _raise)
 
         resp = client.post("/api/v1/search/visual", json={"query": "shirt"})
 

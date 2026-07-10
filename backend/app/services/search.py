@@ -4,7 +4,7 @@ from app.db.queries import search as search_queries
 from app.db.session import get_connection
 from app.models.requests.search import SearchProductsRequest, SearchVisualRequest
 from app.models.responses.search import SearchHit
-from app.services.embeddings import embed_query_text, embed_query_visual
+from app.services.embeddings import embed_query_text
 from app.services.products import row_to_summary, validate_categorical_filters
 
 
@@ -47,7 +47,9 @@ def search_products(request: SearchProductsRequest) -> list[SearchHit]:
 
 
 def search_visual(request: SearchVisualRequest) -> list[SearchHit]:
-    qvec = embed_query_visual(request.query)
+    # M11 escape hatch (architecture.md §5, db/queries/search.py::VISUAL_SEARCH):
+    # BGE text embeddings, not CLIP — CLIP OOMs Render's 512MB free tier.
+    qvec = embed_query_text(request.query)
 
     conn = get_connection()
     with conn.cursor() as cur:

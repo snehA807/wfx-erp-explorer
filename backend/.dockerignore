@@ -1,0 +1,14 @@
+# CLAUDE.md invariant 4 / backend-spec.md §11: a local .env must never be
+# copyable into the image even by accident.
+.env
+.env.*
+!.env.example
+
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+tests/
+.git/
+.DS_Store
