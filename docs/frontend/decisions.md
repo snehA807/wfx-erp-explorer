@@ -320,3 +320,124 @@ one-line `// wfx:` header comment naming the change:
   (order/payment status → variant) is a dev-tokens-only prototype, not a
   locked mapping — the real `kind`/`value` → tint logic is M12d's custom
   status Badge component.
+
+## D-F32 — D-F26 contrast conflict resolved: soft-tint exception accepted (M12d)
+D-F26 flagged that the locked `success`/`warning`/`danger` hexes fail
+design-system.md §1's own 4.5:1 text-contrast floor when used as text on
+their matching `-soft` tint background (measured: 3.20:1 / 3.04:1 / 4.36:1),
+and deferred the call to M12d's status Badge consumption. Put to the
+requester directly before building `StatusBadge`: accept as a soft-tint-only
+exception, per the option D-F26 itself named as plausible ("common in
+status-badge systems, where the surrounding badge shape + icon/label carries
+meaning, not raw WCAG-AA text contrast"). Requester chose this option.
+`components/ui/badge.tsx`'s `success`/`warning`/`danger` variants ship
+unchanged; no tokens.css edit. `--success`/`--warning`/`--danger` alone on
+`--bg`/`--surface` (e.g. ChartCard, StatusDot) already pass comfortably —
+the exception is scoped to text-on-own-soft-tint only, which is exactly
+Badge's use.
+
+## D-F33 — Recharts pinned to 2.15.4, not the 3.x line (M12d)
+CLAUDE.md's fixed stack names "Recharts" without a major version. 3.x is
+current upstream but is a breaking-change migration off the well-documented
+2.x API; 2.x is deprecated but still the version nearly every existing
+Recharts tutorial/pattern targets. Same reasoning as D-F15 (Tailwind pinned
+to 3.4.x): under deadline compression, the well-trodden major version is
+lower-risk than the newest one. `recharts@2.15.4` (latest 2.x, confirmed
+compatible with React 18 peer range) added to `package.json`. Pre-sanctioned
+by CLAUDE.md's stack list, not a new-dependency decision requiring a
+separate ask.
+
+## D-F34 — Custom status Badge named `StatusBadge`, not `Badge` (M12d)
+component-library.md §4 documents this component simply as "Badge (status)"
+and its own header notes "exact TS shapes are the implementer's mechanical
+translation." A literal `Badge` export would collide with the already-
+exported `Badge` from `components/ui/badge.tsx` (the shadcn primitive
+`StatusBadge` composes internally). Named the file/export `StatusBadge` to
+avoid the collision; behavior and props (`kind`, `value`) match the spec
+exactly. `kind="order"`/`"payment"` → variant mapping matches the prototype
+already shown on `/dev-tokens`' `BadgeMatrix` (D-F27) exactly, so the
+demonstration and the real mapping agree.
+
+## D-F35 — ChartCard color rule: single accent highlight = the largest segment (M12d)
+design-system.md §1 says charts get "accent highlight series + neutral
+grays" but doesn't specify which segment is highlighted. Read literally:
+success/warning/danger are reserved for status Badges only ("status badges
+ONLY (order/payment)"), so ChartCard never uses them, even for a
+Cancelled-orders slice — the highlight is purely about visual emphasis, not
+status semantics. Implemented: the single largest-value segment gets
+`--accent`; every other segment cycles a 3-tone neutral-gray palette built
+from `--border-strong`/`--text-2-current` alpha steps (tokens only, no raw
+hex). `hbar` data is sorted descending so the highlight is always the top
+bar; `donut` keeps the caller's given order (a status funnel reads better
+in pipeline order than value-sorted) and computes the highlight index
+separately.
+
+## D-F36 — Only the revenue-by-category chart gets a deep-link `onSegment` (M12d)
+implementation-plan.md's M12d acceptance criterion literally names one
+target: "chart segment click lands on `/products?category=…`."
+`ProductListParams` (`backend/app/models/requests/products.py`) has no
+`status` field — order status isn't a Products filter — so the "Orders by
+status" donut has no valid deep-link target and renders without an
+`onSegment` prop. This isn't a shortcut: there is no backend-supported
+route for it.
+
+## D-F37 — `EmptyState` ships with only what `error` needs; `chips`/`closest` deferred (M12d)
+component-library.md §4 documents `EmptyState`'s full prop surface
+(`chips`, `closest`) for its `invite`/`no-results` flavors, but those
+flavors' real consumers — `SuggestionChips` (Ask, M12g) and `ProductCard`
+mini-grids (Search/Visual, M12f) — don't exist yet. Building `chips`/
+`closest` handling now would mean depending on components that don't exist
+or inventing throwaway rendering that gets replaced wholesale later.
+Shipped `flavor`, `title`, `body?`, `action?` only — exactly what
+Overview's regional error fallback (this milestone's one consumer) needs.
+Same incremental-growth pattern as `StatusDot`'s `compact` prop (added in
+M12c exactly when the rail presentation needed it, not preemptively in
+M12b). `chips`/`closest` are added when M12f/M12g's flavors ship, logged
+here as the reason the prop surface looks incomplete against the locked
+doc in the meantime.
+
+## D-F38 — `ResultTable`'s "Showing N of M" footer only renders when rows are actually truncated (M12d)
+component-library.md §4 spec's the footer as "Showing 10 of N," written for
+the arbitrary-SQL-result case (AICard, M12g) where results can run into the
+thousands. Overview's recent-orders call always passes exactly `maxRows`
+(10) rows — the backend itself caps at 10
+(`backend/app/services/dashboard.py::_RECENT_ORDERS_LIMIT`) — so a literal
+"Showing 10 of 10" footer would be true but uninformative noise on every
+load. Implemented the footer to render only when `rows.length > maxRows`;
+Overview never triggers it, AICard will once real truncation occurs.
+
+## D-F39 — M12d live verification method
+Verified via a throwaway Playwright harness (M12b/M12c pattern — Chromium
+already cached, installed `--no-save` in the scratchpad, deleted after use)
+against the Vite dev server on port 5173 (CORS requirement, D-F31's
+carry-over note) proxying to the real production backend
+(`https://wfx-erp-explorer.onrender.com`). 22/22 checks green: all 5 stat
+values match `GET /dashboard/stats` exactly (fetched independently as
+ground truth in the same script), ₹ crore formatting on the revenue hero,
+`tabular-nums` confirmed via computed `font-variant-numeric`, both chart
+titles render, revenue-by-category bar click navigates to
+`/products?category=Jacket` (real data), recent-orders table renders with
+status badges, skeletons appear during a throttled (1.5s-delayed) load with
+zero measurable layout shift on the stat row, the regional error state (a
+mocked 503) renders `EmptyState` + a working Retry that recovers real data
+while the shell (sidebar) stays intact, reduced-motion collapses the
+load-cascade animation, and zero real console errors (two "Failed to load
+resource: 503" browser network-log lines from the deliberately-mocked
+error test are expected, not application errors, and are excluded from that
+count). One harness bug found and fixed during this pass, not a product
+bug: a request-count-based error/success mock raced React 18 StrictMode's
+dev-only double-invoked effect (mount → cleanup → mount) — the first
+(mocked-error) request's callback lost its race against the `cancelled`
+guard, so the second, real request silently won before any assertion ran.
+Fixed by using a persistent boolean flag instead of a counter, so both
+StrictMode-duplicated requests behave identically within each test phase.
+Full regression sweep across all 8 routes (5 app routes + `/dev-tokens` +
+`/ask` and an unknown path, both redirecting to `/`) at 1440px: zero
+console errors on any route. 375px visual check: MobileTabs (`position:
+fixed; bottom: 0`, confirmed via computed style, unchanged from M12c)
+correctly stays pinned to the viewport bottom with the last recent-order
+row fully clear of it — a full-page (stitched) screenshot briefly appeared
+to show the tab bar floating mid-page, which is a known Chromium
+full-page-screenshot artifact for `position: fixed` elements during
+capture stitching, not a runtime bug; confirmed via computed style plus a
+non-stitched viewport screenshot.

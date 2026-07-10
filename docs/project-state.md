@@ -6,10 +6,10 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 `docs/backlog.md` (deferred scope) — this file only answers "what stage is
 the build at."
 
-**Last updated:** 2026-07-10
-**Current milestone:** M12c — Layout shell (docs/frontend/m12c-contract.md)
+**Last updated:** 2026-07-11
+**Current milestone:** M12d — Overview (Dashboard) (implementation-plan.md M12d section; no separate contract doc)
 **Status:** ✅ Complete
-**Next milestone:** M12d — Overview (Dashboard)
+**Next milestone:** M12e — Product Explorer
 
 ## Milestone status
 
@@ -27,7 +27,7 @@ the build at."
 | M9 | Offline embeddings job | 1 — Backend core | ✅ Complete |
 | M10 | Search endpoints | 1 — Backend core | ✅ Complete |
 | M11 | Backend to production | 2 — Deploy early 🔴 | ✅ Complete |
-| M12 | Frontend foundation | 3 — Frontend | 🟡 In progress (M12a–M12c done) |
+| M12 | Frontend foundation | 3 — Frontend | 🟡 In progress (M12a–M12d done) |
 | M13 | Dashboard + Products screens | 3 — Frontend | ⬜ Not started |
 | M14 | Ask AI screen | 3 — Frontend | ⬜ Not started |
 | M15 | Search, Visual, Detail drawer | 3 — Frontend | ⬜ Not started |
@@ -507,3 +507,74 @@ the build at."
     network failure. Confirmed directly with a manual `OPTIONS`
     preflight (`Disallowed CORS origin`) before re-running the whole
     harness against port 5173, where every check passed cleanly.
+- **M12d (Overview/Dashboard, implementation-plan.md's M12d section — no
+  separate contract doc; consulted component-library.md §4 and
+  design-system.md for anatomy, same as m12c-contract.md did for the
+  shell):** `pages/overview/{index,useStats}.tsx`,
+  `components/{StatCard,ChartCard,ResultTable,StatusBadge,EmptyState}.tsx`
+  (skeleton variants colocated as named exports —
+  `StatCardSkeleton`/`ChartCardSkeleton`/`ResultTableSkeleton`), one new dep
+  (`recharts@2.15.4`, pre-sanctioned by CLAUDE.md's stack list — D-F33),
+  `lib/api.ts` gained `getDashboardStats()` + the `DashboardStats`/
+  `DashboardTotals`/`CategoryRevenue`/`OrderStatusCount`/`RecentOrder` types
+  matching `backend/app/models/responses/dashboard.py` exactly. Five
+  StatCards (Revenue hero, flex-wider via a 6-col grid `col-span-2` — not
+  arbitrary width values, see below), two ChartCards (`hbar` revenue-by-
+  category with a `/products?category=` deep-link, `donut` orders-by-status
+  with no deep-link since Products has no status filter — D-F36), recent-
+  orders `ResultTable` with `StatusBadge` cells.
+  - **D-F26 resolved** (deferred from M12b to this exact milestone): put
+    the soft-tint contrast-floor conflict to the requester directly before
+    building `StatusBadge`; accepted as a soft-tint-only exception, zero
+    token changes (D-F32).
+  - One real mistake caught before commit, not shipped: an early draft used
+    Tailwind arbitrary bracket values (`min-w-[260px]`, `h-[240px]`) for the
+    hero stat card's extra width and the chart skeleton's height — both
+    violate invariant 7 / the m12b-contract.md §13.2 grep check. Fixed
+    before verification: the stat row uses a 6-column grid with the hero
+    card at `col-span-2` (core Tailwind utility, no bracket), and the chart
+    skeleton's height moved to an inline `style` prop, matching how
+    `ChartCard`'s own real chart already sizes itself. Grep re-run clean
+    (zero hex/bracket/duration-literal matches outside `tokens.css`/
+    `components/ui/`) before the build.
+  - Full detail on the Recharts version pin, `StatusBadge` naming (avoids
+    colliding with `components/ui/badge.tsx`'s own `Badge` export), the
+    chart accent/neutral-gray color rule, the deep-link scoping, and
+    `EmptyState`'s deliberately-incomplete-for-now prop surface in
+    `docs/frontend/decisions.md` D-F33–D-F38.
+  - **Verified live via a throwaway Playwright harness** (M12b/M12c
+    pattern, Chromium already cached, deleted after use): 22/22 checks
+    green against the Vite dev server (port 5173, CORS requirement)
+    proxying to the real production backend. All 5 stat values matched
+    `GET /dashboard/stats` exactly (fetched independently in the same
+    script as ground truth); ₹ crore formatting and `tabular-nums`
+    (computed `font-variant-numeric`) confirmed on the revenue hero; a real
+    bar click on the revenue-by-category chart navigated to
+    `/products?category=Jacket`; skeletons appeared under a throttled
+    1.5s-delayed load with ~0px measured shift on the stat row; the
+    regional error state (mocked 503) rendered `EmptyState` + a working
+    Retry that recovered real data with the shell (sidebar) intact;
+    reduced-motion collapsed the load-cascade animation; zero real console
+    errors (two expected 503 network-log lines from the deliberate mock
+    excluded, D-F39). Full 8-route regression sweep (5 app routes +
+    `/dev-tokens` + `/ask` and an unknown-path redirect) at 1440px: zero
+    console errors anywhere. 375px visual pass confirmed MobileTabs (from
+    M12c, untouched this milestone) stays correctly pinned to the viewport
+    bottom via computed style + a non-stitched screenshot, after a
+    stitched full-page screenshot briefly looked wrong (Chromium
+    full-page-capture artifact for `position: fixed`, not a runtime bug —
+    D-F39).
+  - **One test-harness bug found and fixed during verification, not a
+    product bug** (D-F39): the error-state mock used a request-count
+    counter to serve one 503 then succeed on retry, which raced React 18
+    StrictMode's dev-only double-invoked effect (mount → cleanup → mount)
+    — the first (error) request's state update lost to the `cancelled`
+    guard, letting the second, real request silently win before any
+    assertion ran, so the error UI never appeared to check. Fixed by
+    switching the mock to a persistent boolean flag instead of a counter,
+    so both StrictMode-duplicated requests behave identically within each
+    test phase.
+  - `npm run build` clean, strict TS clean.
+  - `docs/frontend/decisions.md` gained D-F32–D-F39 (this milestone's own
+    entries plus the D-F26 resolution). Commit: `feat(frontend): M12d
+    overview dashboard`.

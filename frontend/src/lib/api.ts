@@ -81,3 +81,45 @@ export async function getHealth(): Promise<HealthResponse> {
   const { data } = await request<HealthResponse>("/health");
   return data;
 }
+
+// backend/app/models/responses/dashboard.py — GET /dashboard/stats (M12d).
+export interface DashboardTotals {
+  finished_goods: number;
+  suppliers: number;
+  buyers: number;
+  orders: number;
+  revenue: number;
+}
+
+export interface CategoryRevenue {
+  category: string | null;
+  revenue: number;
+}
+
+export interface OrderStatusCount {
+  status: string;
+  count: number;
+}
+
+export interface RecentOrder {
+  order_number: string;
+  buyer_name: string;
+  style_number: string;
+  style_name: string;
+  quantity: number;
+  unit_price: number;
+  status: string;
+  shipment_date: string | null;
+}
+
+export interface DashboardStats {
+  totals: DashboardTotals;
+  revenue_by_category: CategoryRevenue[];
+  order_status_counts: OrderStatusCount[];
+  recent_orders: RecentOrder[];
+}
+
+export async function getDashboardStats(): Promise<DashboardStats> {
+  const { data } = await request<DashboardStats>("/dashboard/stats");
+  return data;
+}
