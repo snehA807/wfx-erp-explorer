@@ -1,0 +1,12 @@
+/* Self-hosted fonts (m12b-contract.md §1: Fontsource, no CDN). Weights per
+   design-system.md §2: Inter 400/500/600, JetBrains Mono 400/450 (falls back
+   to 400 if 450 isn't published for the variable family). */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "./styles/tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

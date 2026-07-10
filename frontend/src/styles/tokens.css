@@ -1,0 +1,467 @@
+/* ==========================================================================
+   WFX Explorer — Design Tokens (M12b)
+   Single source of truth for every raw value in the app. Tailwind's theme
+   layer (tailwind.config.js) only *references* these variables — it never
+   restates a value. See docs/frontend/m12b-contract.md §2 for the region map.
+   ========================================================================== */
+
+/* ---- Region 1: :root — light palette + universal tokens -----------------
+   Raw light + inset palettes, accent/status, and every palette-independent
+   metric (type, space, radius, elevation, motion, seam, z-index). Color
+   values are HSL channel triplets (no hsl() wrapper) converted from the
+   locked hexes in design-system.md §1; each carries the source hex in a
+   trailing comment for audit. The "-current" family here is the entire
+   theming mechanism (see Region 2): components consume -current, never the
+   raw absolute names, except for the explicit inset-absolute utilities. */
+:root {
+  /* raw light palette (design-system.md §1 "Light palette") */
+  --bg: 60 9% 98%; /* #FAFAF9 */
+  --surface: 0 0% 100%; /* #FFFFFF */
+  --border: 20 6% 90%; /* #E7E5E4 */
+  --border-strong: 24 6% 83%; /* #D6D3D1 */
+  --text: 24 10% 10%; /* #1C1917 */
+  --text-2: 25 5% 45%; /* #78716C */
+  --action: 24 10% 10%; /* #1C1917 */
+  --action-hover: 12 6% 15%; /* #292524 */
+
+  /* raw inset palette (design-system.md §1 "Inset palette") */
+  --inset: 240 8% 9%; /* #16161A */
+  --inset-surface: 240 8% 15%; /* #232329 */
+  --inset-border: 240 6% 19%; /* #2E2E34 */
+  --inset-text: 60 8% 95%; /* #F4F4F2 */
+  --inset-text-2: 48 5% 59%; /* #9C9A92 */
+  --seam-inset: 240 6% 24%; /* #3A3A42 */
+
+  /* accent & status (design-system.md §1 "Accent & status") — palette-independent */
+  --accent: 75 90% 61%; /* #C8F542 */
+  --accent-ink: 77 100% 12%; /* #2A3B00 */
+  --success: 142 76% 36%; /* #16A34A */
+  --warning: 32 95% 44%; /* #D97706 */
+  --danger: 0 72% 51%; /* #DC2626 */
+  --success-soft: 138 76% 97%; /* #F0FDF4 */
+  --warning-soft: 48 100% 96%; /* #FFFBEB */
+  --danger-soft: 0 86% 97%; /* #FEF2F2 */
+
+  /* seam color, light (design-system.md §12: "--border-strong on light") */
+  --seam: 24 6% 83%; /* = --border-strong, #D6D3D1 */
+
+  /* focus ring: darkened accent derivative, >=3:1 vs --bg and --surface.
+     Not a value from design-system.md — derived here per m12b-contract.md
+     §10's instruction ("ring color = a darkened accent derivative"); logged
+     in docs/frontend/decisions.md (D-F22). Accent hue/sat held (75, 90%),
+     lightness lowered to the minimum that clears 3:1 against both surfaces
+     (measured: 3.25:1 vs --surface, 3.11:1 vs --bg). */
+  --ring: 75 90% 32%; /* #769B08 */
+
+  /* semantic "-current" family — defaults to light values here; the .inset
+     scope (Region 2) is the only place these get redefined. All app code
+     (outside components/ui) consumes -current, never the raw names above,
+     except border-strong (light-only, no inset counterpart defined) and the
+     explicit inset-* absolutes. */
+  --bg-current: var(--bg);
+  --surface-current: var(--surface);
+  --border-current: var(--border);
+  --text-current: var(--text);
+  --text-2-current: var(--text-2);
+  --seam-current: var(--seam);
+  --ring-current: var(--ring);
+
+  /* type metrics (design-system.md §2) */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  --text-display-size: 30px;
+  --text-display-weight: 600;
+  --text-display-tracking: -0.02em;
+  --text-display-lh: 1.2;
+
+  --text-title-size: 18px;
+  --text-title-weight: 600;
+  --text-title-lh: 1.2;
+
+  --text-body-size: 14px;
+  --text-body-weight: 400;
+  --text-body-lh: 1.5;
+
+  --text-small-size: 13px;
+  --text-small-weight: 400;
+  --text-small-lh: 1.5;
+
+  --text-micro-size: 12px;
+  --text-micro-weight: 500;
+  --text-micro-tracking: 0.04em;
+  --text-micro-lh: 1.2;
+
+  --text-stat-size: 28px;
+  --text-stat-weight: 600;
+  --text-stat-lh: 1.2;
+
+  --text-stat-hero-size: 32px;
+  --text-stat-hero-weight: 600;
+  --text-stat-hero-lh: 1.2;
+
+  --text-mono-size: 13px;
+  --text-mono-weight: 450;
+
+  /* space scale (design-system.md §3) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  /* Named exception to the 4px scale (design-system.md §3: "Title block
+     bottom margin 40 — the one place generous air is spent"). Logged per
+     §13's "adding a token = one-line rationale" — see decisions.md D-F22. */
+  --space-title-bottom: 40px;
+
+  /* Main column max-width (design-system.md §6: "Main column max-width
+     1320, centered"). Logged in decisions.md D-F22. */
+  --content-max-width: 1320px;
+
+  /* radius (design-system.md §5) */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
+  /* elevation (design-system.md §4) */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-card-hover: 0 6px 16px rgba(0, 0, 0, 0.08);
+  --shadow-float: 0 8px 24px rgba(0, 0, 0, 0.12);
+
+  /* motion durations/easings (motion.md §1) */
+  --dur-fast: 100ms;
+  --dur-base: 150ms;
+  --dur-slow: 200ms;
+  --dur-zoom: 300ms;
+  --ease-out-app: cubic-bezier(0.2, 0, 0, 1);
+  --ease-press: cubic-bezier(0.3, 0, 0.6, 1);
+
+  /* seam metrics (design-system.md §12) */
+  --seam-dash: 6px;
+  --seam-gap: 4px;
+
+  /* z-index scale (design-system.md §13) */
+  --z-shell: 10;
+  --z-panel: 40;
+  --z-palette: 50;
+  --z-toast: 60;
+}
+
+/* Type role composite classes (m12b-contract.md §1 & §4): size + weight +
+   tracking + case + numeric features baked in once. App code writes
+   `text-role-*`, never hand-stacked font utilities. */
+@layer components {
+  .text-role-display {
+    font-family: var(--font-sans);
+    font-size: var(--text-display-size);
+    font-weight: var(--text-display-weight);
+    letter-spacing: var(--text-display-tracking);
+    line-height: var(--text-display-lh);
+  }
+  .text-role-title {
+    font-family: var(--font-sans);
+    font-size: var(--text-title-size);
+    font-weight: var(--text-title-weight);
+    line-height: var(--text-title-lh);
+  }
+  .text-role-body {
+    font-family: var(--font-sans);
+    font-size: var(--text-body-size);
+    font-weight: var(--text-body-weight);
+    line-height: var(--text-body-lh);
+  }
+  .text-role-small {
+    font-family: var(--font-sans);
+    font-size: var(--text-small-size);
+    font-weight: var(--text-small-weight);
+    line-height: var(--text-small-lh);
+  }
+  .text-role-micro {
+    font-family: var(--font-sans);
+    font-size: var(--text-micro-size);
+    font-weight: var(--text-micro-weight);
+    letter-spacing: var(--text-micro-tracking);
+    line-height: var(--text-micro-lh);
+    text-transform: uppercase;
+  }
+  .text-role-stat {
+    font-family: var(--font-sans);
+    font-size: var(--text-stat-size);
+    font-weight: var(--text-stat-weight);
+    line-height: var(--text-stat-lh);
+    font-variant-numeric: tabular-nums;
+  }
+  .text-role-stat-hero {
+    font-family: var(--font-sans);
+    font-size: var(--text-stat-hero-size);
+    font-weight: var(--text-stat-hero-weight);
+    line-height: var(--text-stat-hero-lh);
+    font-variant-numeric: tabular-nums;
+  }
+  .text-role-mono-ui {
+    font-family: var(--font-mono);
+    font-size: var(--text-mono-size);
+    font-weight: var(--text-mono-weight);
+  }
+}
+
+/* ---- Region 2: .inset scope — machine-surface overrides ------------------
+   Redefines the semantic "-current" family to inset values. Any subtree
+   rooted at a `.inset` element renders correctly with zero component-level
+   awareness. Sanctioned .inset roots (D-F02, exhaustive): Ask page main
+   region, AICard, SQLBlock, CommandPalette. In M12b `.inset` is applied only
+   on /dev-tokens demo panels. Machine surfaces also carry
+   `data-surface="machine"` for grep-ability (no styling hook). */
+.inset {
+  --bg-current: var(--inset);
+  --surface-current: var(--inset-surface);
+  --border-current: var(--inset-border);
+  --text-current: var(--inset-text);
+  --text-2-current: var(--inset-text-2);
+  --seam-current: var(--seam-inset);
+  /* Lime glow ring on inset (D-F04 sanctioned use: "inset focus glow") —
+     full-brightness accent reads clearly on dark surfaces, unlike the
+     darkened --ring derivative tuned for light backgrounds. */
+  --ring-current: var(--accent);
+  /* `color` is inherited, but inheritance carries an already-*computed*
+     value down the tree — a descendant that never declares its own `color`
+     would otherwise keep showing the light-mode text color it inherited
+     from `body`, even though --text-current has flipped for this subtree.
+     Declaring color/background here (not just redefining the variables)
+     makes .inset a real inheritance root, so unstyled text is never
+     dark-on-dark. */
+  background-color: hsl(var(--bg-current));
+  color: hsl(var(--text-current));
+}
+
+/* ---- Region 3: shadcn bridge ---------------------------------------------
+   Assigns shadcn's expected variable names from our tokens, in both :root
+   and .inset. Bridge, don't fork (m12b-contract.md §7): unmodified shadcn
+   components are automatically correct on both palettes.
+
+   --border, --ring and --radius are deliberately NOT redeclared here: region
+   1 already defines --radius directly, and the app-facing "border"/"ring"
+   Tailwind keys (tailwind.config.js) reference --border-current/
+   --ring-current directly too — redeclaring --border/--ring under their own
+   names here would collide with region 1's identically-named raw tokens in
+   the same :root scope (last-declaration-wins for a custom property), which
+   very nearly shipped as a circular var() reference (--border ->
+   var(--border-current) -> var(--border) -> ...), silently invalidating
+   both. Same reasoning is why shadcn's internal hover/selected chrome color
+   is bridged here as --chrome/--chrome-foreground, not --accent: our
+   --accent is the sanctioned lime token (component-library.md exposes
+   "accent" as app-facing vocabulary, D-F04's six-location budget) and must
+   stay a single, unambiguous meaning — Select/Command/Button hover chrome
+   gets a neutral tint instead (components/ui/*.tsx use `bg-chrome`/
+   `text-chrome-foreground` in place of the shadcn-default `bg-accent`/
+   `text-accent-foreground`, a class-level edit per §7). */
+:root {
+  --background: var(--bg-current);
+  --foreground: var(--text-current);
+  --card: var(--surface-current);
+  --card-foreground: var(--text-current);
+  --popover: var(--surface-current);
+  --popover-foreground: var(--text-current);
+  /* Primary = the current surface's "ink" as a fill, inverted text — reads
+     as near-black-on-white in light, near-white-on-dark in inset, using only
+     already-locked semantic tokens (no new inset-specific action color). */
+  --primary: var(--text-current);
+  --primary-foreground: var(--bg-current);
+  --secondary: var(--border-current);
+  --secondary-foreground: var(--text-current);
+  --muted: var(--border-current);
+  --muted-foreground: var(--text-2-current);
+  --chrome: var(--border-current);
+  --chrome-foreground: var(--text-current);
+  --destructive: var(--danger);
+  --destructive-foreground: var(--surface);
+  --input: var(--border-current);
+}
+
+.inset {
+  --background: var(--bg-current);
+  --foreground: var(--text-current);
+  --card: var(--surface-current);
+  --card-foreground: var(--text-current);
+  --popover: var(--surface-current);
+  --popover-foreground: var(--text-current);
+  --primary: var(--text-current);
+  --primary-foreground: var(--bg-current);
+  --secondary: var(--border-current);
+  --secondary-foreground: var(--text-current);
+  --muted: var(--border-current);
+  --muted-foreground: var(--text-2-current);
+  --chrome: var(--border-current);
+  --chrome-foreground: var(--text-current);
+  --destructive: var(--danger);
+  --destructive-foreground: var(--surface);
+  --input: var(--border-current);
+}
+
+/* ---- Region 4: base layer -------------------------------------------------
+   Page background/text from semantic tokens, font smoothing, global focus
+   ring, selection color. */
+@layer base {
+  * {
+    border-color: hsl(var(--border-current));
+  }
+  body {
+    background-color: hsl(var(--bg-current));
+    color: hsl(var(--text-current));
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background-color: hsl(var(--accent) / 0.3);
+    color: hsl(var(--text-current));
+  }
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring-current));
+    outline-offset: 2px;
+  }
+}
+
+/* ---- Region 5: keyframes + reduced motion --------------------------------
+   Motion recipe classes are composed from these once, never re-declared per
+   component (motion.md §1–§5). */
+@layer utilities {
+  @keyframes fade-rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes stitch-draw {
+    from {
+      stroke-dashoffset: calc(var(--seam-dash) + var(--seam-gap));
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes caret-blink {
+    0%,
+    49% {
+      opacity: 1;
+    }
+    50%,
+    100% {
+      opacity: 0;
+    }
+  }
+  @keyframes dot-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  /* Card hover (motion.md §2): lift -2px + shadow bloom + border brighten */
+  .card-hover {
+    transition:
+      transform var(--dur-base) var(--ease-out-app),
+      box-shadow var(--dur-base) var(--ease-out-app),
+      border-color var(--dur-base) var(--ease-out-app);
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover);
+    border-color: hsl(var(--border-strong));
+  }
+
+  /* Product image zoom (motion.md §2): frame static, inner image scales */
+  .img-zoom-frame {
+    overflow: hidden;
+  }
+  .img-zoom-inner {
+    transition: transform var(--dur-zoom) var(--ease-out-app);
+  }
+  .img-zoom-frame:hover .img-zoom-inner {
+    transform: scale(1.04);
+  }
+
+  /* Button press (motion.md §2) */
+  .press {
+    transition: transform 80ms var(--ease-press);
+  }
+  .press:active {
+    transform: scale(0.98);
+  }
+
+  /* Ask composer focus glow on inset (motion.md §2): lime bloom, 200ms */
+  .focus-glow-inset {
+    transition: box-shadow var(--dur-slow) var(--ease-out-app);
+  }
+  .focus-glow-inset:focus-visible {
+    box-shadow: 0 0 0 4px hsl(var(--accent) / 0.35);
+  }
+
+  /* Stat card load cascade (motion.md §2): staggered fade + rise, 30ms/step */
+  .cascade-item {
+    animation: fade-rise var(--dur-slow) var(--ease-out-app) both;
+    animation-delay: calc(var(--cascade-index, 0) * 30ms);
+  }
+
+  .caret-blink {
+    animation: caret-blink 1s steps(1) infinite;
+  }
+  .dot-pulse {
+    animation: dot-pulse 2.4s ease-in-out infinite;
+  }
+  .stitch-draw {
+    animation: stitch-draw 1.2s linear infinite;
+  }
+}
+
+/* Reduced motion (motion.md §6): one global block. Transforms/durations
+   collapse to 0; decorative animations vanish outright. Informational
+   content (SeamProgress stage, status text) is preserved via JS
+   (usePrefersReducedMotion in lib/theme.ts) — this block only removes the
+   decorative layer.
+
+   Wrapped in the same `@layer utilities` as the recipe classes above:
+   Tailwind v3's @layer is a build-time relocation (PostCSS moves each
+   @layer block's contents to its @tailwind directive's position and
+   strips the wrapper — it is NOT the native CSS cascade-layers at-rule).
+   An unwrapped block here would keep its early physical position (this
+   file is @imported before `@tailwind utilities;`), landing BEFORE the
+   hoisted .card-hover:hover rule instead of after it — losing the
+   override at equal specificity despite reading later in the source. */
+@layer utilities {
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    .card-hover:hover {
+      transform: none;
+      box-shadow: var(--shadow-card);
+      border-color: hsl(var(--border-current));
+    }
+    .img-zoom-frame:hover .img-zoom-inner {
+      transform: none;
+    }
+    .press:active {
+      transform: none;
+    }
+    .cascade-item {
+      animation: none;
+    }
+  }
+}
