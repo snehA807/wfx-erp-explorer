@@ -1,0 +1,45 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { getHealth, type HealthResponse } from "../api";
+
+export type HealthStatus = "live" | "degraded" | "down";
+
+interface UseHealthResult {
+  status: HealthStatus;
+  health: HealthResponse | null;
+  /** True once the first health check has taken longer than 3s (cold-start signal). */
+  isSlow: boolean;
+}
+
+export function useHealth(): UseHealthResult {
+  const [health, setHealth] = useState<HealthResponse | null>(null);
+  const [status, setStatus] = useState<HealthStatus>("live");
+  const [isSlow, setIsSlow] = useState(false);
+  const hasCheckedOnce = useRef(false);
+
+  const check = useCallback(async () => {
+    let slowTimer: ReturnType<typeof setTimeout> | null = null;
+    if (!hasCheckedOnce.current) {
+      slowTimer = setTimeout(() => setIsSlow(true), 3000);
+    }
+    try {
+      const result = await getHealth();
+      setHealth(result);
+      setStatus(result.status === "ok" ? "live" : "degraded");
+    } catch {
+      setStatus("down");
+    } finally {
+      if (slowTimer) clearTimeout(slowTimer);
+      hasCheckedOnce.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    void check();
+    const onFocus = () => void check();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [check]);
+
+  return { status, health, isSlow };
+}

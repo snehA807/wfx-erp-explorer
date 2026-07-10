@@ -7,9 +7,9 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 the build at."
 
 **Last updated:** 2026-07-10
-**Current milestone:** M10 — Search endpoints
+**Current milestone:** M12a — Frontend project foundation (docs/frontend/implementation-plan.md)
 **Status:** ✅ Complete
-**Next milestone:** M11 — Backend to production
+**Next milestone:** M12b — Design system (tokens layer)
 
 ## Milestone status
 
@@ -26,8 +26,8 @@ the build at."
 | M8 | /query SSE pipeline | 1 — Backend core | ✅ Complete |
 | M9 | Offline embeddings job | 1 — Backend core | ✅ Complete |
 | M10 | Search endpoints | 1 — Backend core | ✅ Complete |
-| M11 | Backend to production | 2 — Deploy early 🔴 | ⬜ Not started |
-| M12 | Frontend foundation | 3 — Frontend | ⬜ Not started |
+| M11 | Backend to production | 2 — Deploy early 🔴 | ✅ Complete |
+| M12 | Frontend foundation | 3 — Frontend | 🟡 In progress (M12a done) |
 | M13 | Dashboard + Products screens | 3 — Frontend | ⬜ Not started |
 | M14 | Ask AI screen | 3 — Frontend | ⬜ Not started |
 | M15 | Search, Visual, Detail drawer | 3 — Frontend | ⬜ Not started |
@@ -347,3 +347,39 @@ the build at."
   - `core/guardrails.py`/`tests/test_guardrails.py` untouched — CLAUDE.md
     invariant 6 not triggered, no guardrail-relevant change in this
     milestone.
+- **M11 (Backend to production) found already live** while verifying M12a
+  against a deployed backend: `https://wfx-erp-explorer.onrender.com`
+  responds correctly on `/api/v1/health` (`database: connected,
+  nl2sql_ready: true`), `/products`, `/products/{id}/similar`,
+  `/dashboard/stats`, `/filters/options`, `/search/products`, and `/query`
+  (full SSE run verified, answer streamed and reassembled correctly). Marked
+  Complete above on that evidence — this file hadn't been updated since the
+  M11 Docker-config commit (`b7997ec`) landed.
+- **M12a (Frontend project foundation, `docs/frontend/implementation-plan.md`):**
+  bare Vite + React 18 + TS scaffold — `app/{main,router,providers}`, 5
+  lazy-loaded route placeholders, `lib/{api.ts,sse.ts,format.ts,recents.ts}`,
+  `lib/hooks/useHealth.ts`. No Tailwind/shadcn/tokens/theme — the kickoff
+  brief listed those as M12a scope, but implementation-plan.md's M12a section
+  states its goal as "zero visual work" and explicitly excludes them,
+  reserving them for M12b; followed the locked doc after confirming with the
+  requester (`docs/frontend/decisions.md` D-F19).
+  - `api.ts`/`sse.ts` verified against the live Render backend (not local):
+    `GET /health` success, forced `404 NOT_FOUND` on a bad style number, and
+    a complete `/query` SSE run, via a throwaway esbuild-bundled Node
+    harness (deleted after use, D-F21).
+  - Found and logged one real doc/backend mismatch: the `/query` `done`
+    event's `meta` shape is `{sql_model, sql_prompt_tokens,
+    sql_completion_tokens, sql_cost_usd, answer_model, answer_prompt_tokens,
+    answer_completion_tokens, answer_cost_usd, total_cost_usd}`, not the
+    documented `{model, tokens, cost}` (`docs/frontend/decisions.md` D-F20).
+    `sse.ts`'s `QueryDoneMeta` type matches the real payload; M12g's AICard
+    footer will need to render from it.
+  - `npm run build` clean (5 route chunks + shared vendor chunk); dev server
+    boots and serves all routes. No headless browser tool was available to
+    interactively click through the `/ask` and `*` redirects, so that part
+    was verified via code review of `app/router.tsx` plus the clean build,
+    not an interactive pass — flagged for a real-browser re-check at M12c.
+  - `npm audit` reports a moderate esbuild/vite dev-server advisory
+    (GHSA-67mh-4wv8-2f99); fixing it means jumping to `vite@8`, a breaking
+    major bump out of scope for this milestone and a call for the requester,
+    not made unilaterally. Dev-only; does not affect production build output.
