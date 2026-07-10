@@ -2,3 +2,10 @@
 # pins it for scripts/, which runs standalone and predates backend/'s own
 # dependency manifest (created in M3).
 psycopg[binary]>=3.1,<4
+
+# fastembed is already named in CLAUDE.md's fixed stack (BGE-small 384d,
+# CLIP ViT-B/32 512d) — used only by generate_embeddings.py (M9). Pulls in
+# requests and Pillow as its own dependencies, so neither is listed here
+# separately. Verified installable on this machine's Python 3.9 (no
+# PyTorch, ONNX runtime only).
+fastembed>=0.7,<0.8

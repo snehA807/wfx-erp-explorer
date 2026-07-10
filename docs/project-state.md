@@ -7,9 +7,9 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 the build at."
 
 **Last updated:** 2026-07-10
-**Current milestone:** M8 — /query SSE pipeline
+**Current milestone:** M9 — Offline embeddings job
 **Status:** ✅ Complete
-**Next milestone:** M9 — Offline embeddings job
+**Next milestone:** M10 — Search endpoints
 
 ## Milestone status
 
@@ -24,7 +24,7 @@ the build at."
 | M6 | SQL guardrails + tests | 1 — Backend core | ✅ Complete |
 | M7 | Vanna + training package | 1 — Backend core 🔴 | ✅ Complete |
 | M8 | /query SSE pipeline | 1 — Backend core | ✅ Complete |
-| M9 | Offline embeddings job | 1 — Backend core | ⬜ Not started |
+| M9 | Offline embeddings job | 1 — Backend core | ✅ Complete |
 | M10 | Search endpoints | 1 — Backend core | ⬜ Not started |
 | M11 | Backend to production | 2 — Deploy early 🔴 | ⬜ Not started |
 | M12 | Frontend foundation | 3 — Frontend | ⬜ Not started |
@@ -39,7 +39,7 @@ the build at."
 
 🔴 = red-flagged risk milestone (playbook.md).
 
-## Open items carried into M9
+## Open items carried into M10
 
 - `docs/backlog.md`: Docker Compose scope conflict — resolved 2026-07-10
   (`docs/decisions.md`): playbook.md is the execution authority, stays in
@@ -47,8 +47,8 @@ the build at."
 - `finished_goods.search_text` is generated at seed time by
   `scripts/seed_db.py::build_search_text()` (concatenates style_name,
   category, fabric, color, print, season, brand) since no source CSV column
-  exists for it. Not a locked decision — safe to change before M9 embeds it,
-  since re-running the seed script overwrites the column via upsert.
+  exists for it. **Now locked** (`docs/decisions.md`, M9) — it's the BGE
+  input for all 1,000 embedded rows; changing it means a full re-embed.
 - ~~`scripts/requirements.txt` vs. a shared manifest~~ — resolved during M3:
   kept separate on purpose. `backend/requirements.txt` now exists (full API
   stack); merging would force anyone running just the seed script to install
@@ -67,11 +67,11 @@ the build at."
   `backend/.env`'s `DATABASE_URL` now uses Supabase's pooler connection
   string. All M4 verification ran against the real Supabase DB successfully.
 - `GET /products/{style_number}/similar` is implemented as a real HNSW
-  cosine-distance lookup on `text_embedding`, but returns an honestly empty
-  list pre-M9 — confirmed live that all 1000 `finished_goods` rows still
-  have `text_embedding IS NULL`. No fabricated similarity logic; revisit
-  once M9 backfills embeddings (nothing to change in the endpoint itself,
-  since the query already excludes NULL embeddings on both sides).
+  cosine-distance lookup on `text_embedding`. Pre-M9 it honestly returned an
+  empty list (all 1,000 rows had `text_embedding IS NULL`); **M9 backfilled
+  every row, and the endpoint now returns real neighbors with zero code
+  changes** — verified live (WFX-3310 "Signature Brown Polo" → 6 neighbors,
+  all Polo category, mostly Cotton Pique/Cotton-Spandex, all "Solid" print).
 - Query-param dependency gotcha (found + fixed during M4 verification):
   FastAPI's bare `Depends()` on a Pydantic model only extracts individual
   declared fields as separate `Query(...)` params — it does not validate
@@ -242,3 +242,52 @@ the build at."
     verified live against real OpenRouter output on both endpoints.
   - `core/rate_limit.py`'s stale comment (said `/query` "doesn't exist
     until M8" — cosmetic drift from M7) corrected in passing.
+- **M9 (Offline embeddings job, `scripts/generate_embeddings.py`):**
+  standalone owner-role script, symmetric with `seed_db.py` — no imports
+  from `backend/app/`, no FastAPI, no LLM. Two independent stages, each
+  resumable via `WHERE <col> IS NULL` (no checkpoint file, no `--force`
+  flag): text via `BAAI/bge-small-en-v1.5` (384d), image via
+  `Qdrant/clip-ViT-B-32-vision` (512d, paired with
+  `Qdrant/clip-ViT-B-32-text` for M10). Model IDs verified live against
+  fastembed 0.7.4's `list_supported_models()` before writing the script,
+  not trusted from memory.
+  - **Dependency proof run first** (biggest flagged risk: this machine only
+    has Python 3.9, no 3.10/3.11, and recent `onnxruntime` often needs
+    ≥3.10): `fastembed==0.7.4` installed cleanly into `backend/.venv`
+    (py3.9) with no PyTorch; a live 2-sample smoke test (one string, one
+    downloaded real dataset image) confirmed 384d/512d output before any
+    real script code was written. `requests` and `Pillow` came in as
+    fastembed's own transitive dependencies, confirmed via the actual
+    install log — no new deps beyond `fastembed` added to
+    `scripts/requirements.txt`.
+  - Full run against real Supabase: **1000/1000 text embeddings, 1000/1000
+    image embeddings, 0 download failures.** Text stage ~seconds, image
+    stage the long pole (1,000 downloads via an 8-worker
+    `ThreadPoolExecutor`, cached to gitignored `data/images/`, chunks of 32
+    committed independently). In-script assertions (count +
+    `vector_dims()`) all passed.
+  - Independent verification beyond the script's own assertions: an
+    out-of-band client-side check on 8 random rows recomputed vector norms
+    from the raw `::text` cast — all exactly 384d/512d, norm ≈1.0
+    (confirms both fastembed models really do output L2-normalized
+    vectors, so `<=>` needs no extra normalization at query time).
+  - Idempotency verified by an immediate second full run:
+    `text stage: 0 rows to process` / `image stage: 0 rows to process`,
+    zero rows touched, same 1000/1000 verification passed again.
+  - Live regression, both endpoints already built in earlier milestones,
+    zero code changes needed to either:
+    1. `GET /products/{style}/similar` now returns real neighbors (WFX-3310
+       "Signature Brown Polo" → 6 results, all Polo/Cotton Pique or
+       Cotton-Spandex/Solid print) instead of the pre-M9 honest empty list.
+    2. `POST /query` re-run on a `SELECT *` question (M8's known risk
+       area): the SSE `rows` event's `columns` list still excludes
+       `text_embedding`/`image_embedding` even though both are now real,
+       non-NULL pgvector values — confirms `_strip_hidden_columns`
+       (`query_pipeline.py`, added in M8) actually pre-empts the
+       non-JSON-serializable-vector crash it was written to guard against,
+       not just the NULL case it was tested against at the time.
+  - No image download failures occurred against the real dataset, so the
+    retry/skip/NULL-and-report failure path is verified only in isolation
+    (a deliberately-invalid URL), not against a real transient failure —
+    flagged in `docs/decisions.md`, not re-tested further since the real
+    run had nothing to retry.

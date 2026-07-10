@@ -38,6 +38,29 @@ approximation. If an evaluator's literal wording differs, Vanna's
 semantic retrieval should still match closely — train_check.py passed
 18/18 against the wording actually used.
 
+2026-07-10 — M9 — `finished_goods.search_text` (seed-time concatenation of
+style_name/category/fabric/color/print/season/brand) is now locked as the
+BGE input; not changing it post-embed since any change would require a
+full re-embed of all 1,000 rows.
+
+2026-07-10 — M9 — Embedding model IDs fixed and verified live against
+fastembed 0.7.4's `list_supported_models()` before use (not trusted from
+memory): `BAAI/bge-small-en-v1.5` (text, 384d) and
+`Qdrant/clip-ViT-B-32-vision` (image, 512d), paired at query time in M10
+with `Qdrant/clip-ViT-B-32-text` — same CLIP checkpoint on both sides of
+visual search, or cosine similarity across the two encoders is
+meaningless. Both models confirmed to output L2-normalized vectors (norm
+1.0 on live samples), so `<=>` needs no extra normalization step.
+
+2026-07-10 — M9 — A row whose image download fails after 3 retries is
+skipped, not faked: `image_embedding` stays NULL and the run reports it
+loudly (non-zero exit + failed style list) rather than silently
+succeeding with partial data. `/similar` and future M10 search queries
+already filter `IS NOT NULL`, so this degrades coverage, not correctness.
+Live run against the real dataset: 1000/1000 images embedded, 0
+failures, so this path is untested against a real failure — only
+verified via a deliberately-broken URL in isolation.
+
 2026-07-10 — M7 — Vanna→retrieval-prompting escape hatch (architecture.md
 §5) was **not** invoked: train_check.py passed 18/18 on both full runs
 (well above the 12/18 gate), so the escape hatch code itself was not
