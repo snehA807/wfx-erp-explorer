@@ -441,3 +441,133 @@ to show the tab bar floating mid-page, which is a known Chromium
 full-page-screenshot artifact for `position: fixed` elements during
 capture stitching, not a runtime bug; confirmed via computed style plus a
 non-stitched viewport screenshot.
+
+## D-F40 — Products toolbar `search`/`supplier`: real gaps between navigation.md and the frozen backend (M12e)
+navigation.md §2's route tree names `/products ... ?search ?supplier` and
+navigation.md §5 documents the command palette hitting `GET
+/products?search=`. `ProductListParams`
+(`backend/app/models/requests/products.py`) has neither field —
+`extra="forbid"` would 422 on `?search`, and the categorical filter is
+`supplier_id`, not `supplier`, with no supplier facet in
+`FilterOptionsData` to populate a picker from. Per CLAUDE.md ("flag
+conflicts instead of silently deviating") and the backend-frozen
+invariant:
+- `search` is implemented as a client-side quick-filter over the already-
+  fetched page (matches `style_name`/`style_number`/`brand`/`fabric`),
+  still synced to a `?search` URL param for round-trip — honest about what
+  it actually does (real cross-catalog search is `/search`, M12f;
+  "semantic search" is explicitly out of scope for this milestone per
+  implementation-plan.md).
+- No supplier picker was built; `supplier_id` filtering remains reachable
+  via the API but isn't surfaced in the toolbar. Low-value to hand-roll an
+  undiscoverable free-text supplier-ID input against a facet-less field.
+
+Also logged here (same D-F22/D-F28 pattern — named in a doc's prose, no
+variable assigned there): `--detail-panel-width: 480px` (component-
+library.md §4: "Right Sheet 480px"), and two non-token utilities added to
+`tokens.css` for values that would otherwise need a Tailwind arbitrary
+bracket value (invariant 7 / m12b-contract.md §13.2 grep check): `.aspect-
+product` (design-system.md §9: "4:5 image frame") and `.grid-products`
+(design-system.md §6: "auto-fill minmax(240px, 1fr)" — no fixed-breakpoint
+`grid-cols-*` utility can express `auto-fill`).
+
+## D-F41 — FilterRail's `variant: "toolbar"` is the only variant built (M12e)
+component-library.md §4 documents FilterRail's full prop surface (facet
+checkboxes with counts, GSM dual-range slider, Sheet-collapse below 1280)
+but Products only ever needs the named "selects + pills toolbar variant."
+Built exactly that: one Select per categorical facet (`GET
+/filters/options`) + removable pills + "Clear all." No GSM/price slider,
+no Sheet-trigger collapse. `variant` is typed as the literal `"toolbar"`
+rather than a `"toolbar" | "full"` union — the second member joins when
+Search (M12f) actually needs it, same incremental-growth pattern as
+EmptyState's D-F37 and StatusDot's `compact` prop (M12c).
+
+## D-F42 — Products' table view is a page-local `ProductsTable`, not a reuse of `components/ResultTable.tsx` (M12e)
+component-library.md §4's own usage matrix marks `ResultTable` as
+consumed by Ask and Overview only — Products is not listed, unlike
+`ProductCard`/`FilterRail`/`DetailPanel`/`EmptyState`, which the matrix
+does mark for Products. Read literally rather than treated as an
+oversight: `ResultTable` is scoped to schema-agnostic SQL/API row
+rendering (`columns: string[]`, `rows: unknown[][]`), while the Products
+grid/table toggle (design-spec.md §4: "professional gallery, grid/table
+toggle") needs row click-through to `DetailPanel`, which `ResultTable`
+doesn't support and — per this session's explicit instruction not to
+modify previous-milestone files — wasn't a candidate for extending
+either. `pages/products/ProductsTable.tsx` is page-local (component-
+library's promotion rule: shared file on the *second* usage site; same
+pattern as `SQLBlock` living in `pages/ask/` and `Pagination.tsx` living
+in `pages/products/`), reusing `components/ui/table.tsx` primitives
+directly.
+
+## D-F43 — DetailPanel open/close rides browser history, not just the `?style` param (M12e)
+implementation-plan.md's M12e acceptance requires "back button closes
+panel and restores scroll." Setting `?style` via `replace: true` would
+satisfy "URL reflects the open panel" but not scroll restoration — a
+`replace`d history entry never had the pre-open scroll position recorded
+against it. Instead: opening a product **pushes** a new history entry
+(`setSearchParams(next)`, default `replace: false`); the panel's own close
+paths (X button, Esc, overlay click, and a `More like this` chain) all
+call the same `closeDetail()`, which calls `navigate(-1)` when this page
+itself did the pushing (tracked via a ref, not state — avoids re-render
+timing issues) and falls back to stripping `?style` via `replace: true`
+only for a cold deep link with no prior in-app entry to pop. One
+consequence, not a bug: clicking through a "More like this" chain and
+then hitting Back walks back one product at a time, matching normal
+browser expectations for a chain of pushed views. Verified live (Playwright): scroll
+position preserved within 50px across open→close on both the X button and
+the browser Back button; a two-hop "More like this" journey correctly
+restores the first product's panel on Back.
+
+Also promoted `components/VisuallyHidden.tsx` (component-library.md §6,
+first real usage): Radix's Dialog primitive (which `Sheet` wraps) requires
+a `Title` for its accessible name; DetailPanel's own visible `<h2>` already
+serves sighted users, so the required `SheetTitle` renders but is visually
+hidden rather than duplicated on screen.
+
+## D-F44 — M12e live verification method, and two harness bugs found (not product bugs)
+Verified via a throwaway Playwright harness (M12b–M12d pattern — Chromium
+cached from earlier milestones, reinstalled at the pinned version via
+`npx playwright install chromium` since the cache held a different browser
+revision than this Playwright version expected; deleted after use)
+against the Vite dev server on port 5173 proxying to the real production
+backend. **33/33 checks green** on the final run: sort/category-filter/
+search all round-trip through the URL and survive a real page reload;
+`page_size` honored (24 ≤ 48); image zoom + card lift confirmed via
+computed `transform` before/after hover; grid/table toggle round-trips
+`?view` and preserves the active sort/filters in both presentations;
+broken image swaps to `CategoryPlaceholder` (verified via before/after DOM
+inspection of the same physical card, not a text heuristic); pagination
+advances `?page`; DetailPanel renders Seam separators, the spec grid,
+Supplier section, and an honest "More like this" state (real similar items
+here, since M9's embeddings backfill covers this dataset); Escape/X-button/
+browser-Back all close the panel and restore scroll within 50px; a
+two-hop "More like this" journey and Back both work; keyboard-only open
+(focus + Enter) works; the Overview revenue-by-category chart's deep-link
+to `/products?category=` (M12d) still lands correctly — a regression
+check, not new scope; reduced-motion and 375px passes clean. Zero real
+console errors (one deliberate `net::ERR_NAME_NOT_RESOLVED` from the
+broken-image test, expected, same exclusion as M12d's D-F39).
+
+**Two harness bugs found and fixed during this pass, not product bugs**
+(both diagnosed with a standalone debug script before touching any
+verification code, per instruction not to reimplement anything without
+confirming root cause first):
+1. Early locators used `page.locator("main button")` for "the product
+   grid." `<main>` also contains the FilterRail Select triggers, the Sort
+   trigger, and the grid/table toggle buttons — all real `<button>`
+   elements rendered *above* the grid. `.first()` was silently grabbing a
+   toolbar control instead of a card. Fixed by scoping every such locator
+   to `.grid-products button` (the actual `ProductCard` grid container),
+   confirmed via a standalone debug script that logged intermediate DOM
+   state on a timer rather than trusting a single post-hoc assertion.
+2. The broken-image check additionally filtered on `button:has(img)` to
+   find "a card with an image" — self-defeating, since the very fix being
+   tested (swap `<img>` for `CategoryPlaceholder`'s `<svg>`) makes that
+   card stop matching `has(img)`, so the locator silently re-resolved to
+   the *next* card with every later `.evaluate()` call, making a correct
+   swap look like a no-op. Separately, the image-zoom-hover and card-lift-
+   hover checks originally reused the same physical card back-to-back:
+   hovering the `<img>` puts its ancestor `<button>` in CSS `:hover` too
+   (hover cascades to ancestors), so the second check's "before"
+   measurement was already mid-hover. Fixed by using two distinct cards
+   for the two hover checks and moving the mouse to `(0, 0)` between them.

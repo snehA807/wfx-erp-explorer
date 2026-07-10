@@ -111,6 +111,8 @@ export default {
       },
       maxWidth: {
         content: "var(--content-max-width)",
+        // DetailPanel Sheet width (component-library.md §4, decisions.md D-F40).
+        detail: "var(--detail-panel-width)",
       },
       width: {
         // Shell-structural widths (m12c-contract.md §2, decisions.md D-F28).

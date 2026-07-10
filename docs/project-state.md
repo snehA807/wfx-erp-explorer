@@ -7,9 +7,9 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 the build at."
 
 **Last updated:** 2026-07-11
-**Current milestone:** M12d — Overview (Dashboard) (implementation-plan.md M12d section; no separate contract doc)
+**Current milestone:** M12e — Product Explorer (implementation-plan.md M12e section; no separate contract doc)
 **Status:** ✅ Complete
-**Next milestone:** M12e — Product Explorer
+**Next milestone:** M12f — Search + Visual Search
 
 ## Milestone status
 
@@ -27,7 +27,7 @@ the build at."
 | M9 | Offline embeddings job | 1 — Backend core | ✅ Complete |
 | M10 | Search endpoints | 1 — Backend core | ✅ Complete |
 | M11 | Backend to production | 2 — Deploy early 🔴 | ✅ Complete |
-| M12 | Frontend foundation | 3 — Frontend | 🟡 In progress (M12a–M12d done) |
+| M12 | Frontend foundation | 3 — Frontend | 🟡 In progress (M12a–M12e done) |
 | M13 | Dashboard + Products screens | 3 — Frontend | ⬜ Not started |
 | M14 | Ask AI screen | 3 — Frontend | ⬜ Not started |
 | M15 | Search, Visual, Detail drawer | 3 — Frontend | ⬜ Not started |
@@ -578,3 +578,49 @@ the build at."
   - `docs/frontend/decisions.md` gained D-F32–D-F39 (this milestone's own
     entries plus the D-F26 resolution). Commit: `feat(frontend): M12d
     overview dashboard`.
+- **M12e (Product Explorer, implementation-plan.md's M12e section — no
+  separate contract doc):** `pages/products/{index,params,useProducts,
+  Pagination,ProductsTable}.tsx`, `components/{ProductCard,DetailPanel,
+  CategoryPlaceholder,FilterRail,VisuallyHidden}.tsx`,
+  `lib/hooks/useFilterOptions.ts`, `lib/api.ts` gained
+  `getProducts()`/`getProductDetail()`/`getSimilarProducts()`/
+  `getFilterOptions()` + matching types against `backend/app/models/
+  {requests,responses}/products.py` and `responses/filters.py`. Two small
+  additive `tokens.css`/`tailwind.config.js` entries (`--detail-panel-
+  width`, `.aspect-product`, `.grid-products`), same D-F22/D-F28 pattern as
+  prior milestones — not a previous-milestone behavior change.
+  `EmptyState`/`ResultTable` (M12d files) were **not** modified, per this
+  session's explicit instruction; Products' table view is a page-local
+  `ProductsTable` instead of a `ResultTable` reuse (D-F42).
+  - Toolbar: quick-filter search input (client-side, 300ms debounce),
+    sort Select (8 presets over the 5 backend sort fields × 2 orders),
+    grid/table toggle, `FilterRail` toolbar variant (6 categorical Select
+    facets + removable pills + "Clear all," from `GET /filters/options`).
+    All state lives in URL params (`page`, `sort_by`, `order`, the 6
+    categorical filters, `search`, `view`, `style`) — refresh restores the
+    full view, verified live.
+  - **Real doc/backend gap found and flagged, not silently worked around**
+    (D-F40): navigation.md's route tree and command-palette spec both
+    reference a `GET /products?search=` capability that doesn't exist on
+    the frozen backend (`ProductListParams` has no `search` field,
+    `extra="forbid"`). Implemented `search` as a client-side quick-filter
+    over the already-fetched page instead of a fabricated backend call; a
+    supplier picker was similarly omitted (no supplier facet exists to
+    populate one from).
+  - `DetailPanel` fetches `GET /products/{id}` and `/products/{id}/similar`
+    itself (component-library.md's documented single-use fetch exception).
+    Open/close rides real browser history (push on open, `navigate(-1)` on
+    close) specifically so "back button closes panel and restores scroll"
+    holds for both the browser Back button and the panel's own close
+    controls (D-F43) — verified live within 50px, including a two-hop
+    "More like this" journey and Back.
+  - `npm run build` clean, strict TS clean, grep acceptance check (m12b-
+    contract.md §13.2) clean.
+  - **Verified live via a throwaway Playwright harness** (M12b–M12d
+    pattern, Chromium cached, reinstalled at the pinned revision, deleted
+    after use): **33/33 checks green** against the Vite dev server proxying
+    the real production backend — full detail (including two harness bugs
+    found and fixed mid-verification, neither a product bug) in
+    `docs/frontend/decisions.md` D-F44.
+  - `docs/frontend/decisions.md` gained D-F40–D-F44. Commit:
+    `feat(frontend): M12e product explorer`.

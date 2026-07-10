@@ -123,3 +123,148 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const { data } = await request<DashboardStats>("/dashboard/stats");
   return data;
 }
+
+function buildQueryString(params: Record<string, unknown>): string {
+  const usp = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    usp.set(key, String(value));
+  }
+  const qs = usp.toString();
+  return qs ? `?${qs}` : "";
+}
+
+// backend/app/models/requests/products.py — GET /products (M12e).
+export type ProductSortBy = "style_number" | "style_name" | "selling_price" | "gsm" | "category";
+export type SortOrder = "asc" | "desc";
+
+export interface ProductListParams {
+  page?: number;
+  page_size?: number;
+  sort_by?: ProductSortBy;
+  order?: SortOrder;
+  category?: string;
+  fabric?: string;
+  color?: string;
+  print?: string;
+  season?: string;
+  brand?: string;
+  supplier_id?: string;
+  min_price?: number;
+  max_price?: number;
+  min_gsm?: number;
+  max_gsm?: number;
+}
+
+// backend/app/models/responses/products.py — shared list/card + detail shapes.
+export interface ProductSummary {
+  style_number: string;
+  style_name: string;
+  category: string | null;
+  fabric: string;
+  gsm: number;
+  color: string | null;
+  print: string | null;
+  season: string | null;
+  brand: string | null;
+  cost: number | null;
+  selling_price: number;
+  image_url: string;
+  supplier_name: string;
+}
+
+export interface ProductListMeta {
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+}
+
+export async function getProducts(
+  params: ProductListParams,
+): Promise<{ items: ProductSummary[]; meta: ProductListMeta }> {
+  const { data, meta } = await request<ProductSummary[]>(
+    `/products${buildQueryString(params as Record<string, unknown>)}`,
+  );
+  return {
+    items: data,
+    meta: {
+      page: meta.page as number,
+      page_size: meta.page_size as number,
+      total: meta.total as number,
+      total_pages: meta.total_pages as number,
+    },
+  };
+}
+
+export interface SupplierDetail {
+  supplier_id: string;
+  company_name: string;
+  country: string | null;
+  contact: string | null;
+  lead_time_days: number;
+  rating: number;
+}
+
+export interface TechPackDetail {
+  tech_pack_id: string;
+  fabric_details: string | null;
+  construction: string | null;
+  wash_instructions: string | null;
+}
+
+export interface ProductDetailData {
+  style_number: string;
+  style_name: string;
+  category: string | null;
+  fabric: string;
+  gsm: number;
+  color: string | null;
+  print: string | null;
+  season: string | null;
+  brand: string | null;
+  cost: number | null;
+  selling_price: number;
+  image_url: string;
+  supplier: SupplierDetail;
+  tech_pack: TechPackDetail | null;
+}
+
+export async function getProductDetail(styleNumber: string): Promise<ProductDetailData> {
+  const { data } = await request<ProductDetailData>(`/products/${encodeURIComponent(styleNumber)}`);
+  return data;
+}
+
+export async function getSimilarProducts(styleNumber: string, limit = 6): Promise<ProductSummary[]> {
+  const { data } = await request<ProductSummary[]>(
+    `/products/${encodeURIComponent(styleNumber)}/similar${buildQueryString({ limit })}`,
+  );
+  return data;
+}
+
+// backend/app/models/responses/filters.py — GET /filters/options.
+export interface FacetValue {
+  value: string;
+  count: number;
+}
+
+export interface RangeFacet {
+  min: number;
+  max: number;
+}
+
+export interface FilterOptionsData {
+  category: FacetValue[];
+  fabric: FacetValue[];
+  color: FacetValue[];
+  print: FacetValue[];
+  season: FacetValue[];
+  brand: FacetValue[];
+  gsm: RangeFacet;
+  selling_price: RangeFacet;
+}
+
+export async function getFilterOptions(): Promise<FilterOptionsData> {
+  const { data } = await request<FilterOptionsData>("/filters/options");
+  return data;
+}

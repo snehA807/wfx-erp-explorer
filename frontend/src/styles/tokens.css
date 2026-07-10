@@ -128,6 +128,11 @@
   --sidebar-width: 232px;
   --rail-width: 64px;
 
+  /* DetailPanel width (component-library.md §4: "Right Sheet 480px"). Same
+     D-F22/D-F28 pattern — named in prose, no variable assigned there.
+     Logged in decisions.md D-F40. */
+  --detail-panel-width: 480px;
+
   /* Mobile tab label (m12c-contract.md §4): 11px is named explicitly by
      navigation.md but isn't in the type scale (micro is 12px), so it earns
      its own token rather than an arbitrary Tailwind bracket value. Logged
@@ -414,6 +419,23 @@
   }
   .img-zoom-frame:hover .img-zoom-inner {
     transform: scale(1.04);
+  }
+
+  /* Product card image frame (design-system.md §9: "4:5 image frame").
+     Named utility, not a Tailwind `aspect-[4/5]` arbitrary value (M12e,
+     decisions.md D-F40). */
+  .aspect-product {
+    aspect-ratio: 4 / 5;
+  }
+
+  /* Product grids (design-system.md §6: "auto-fill minmax(240px, 1fr) ->
+     4/3/2/1 columns"). A fixed-breakpoint Tailwind grid-cols-* utility can't
+     express auto-fill, so this is a named utility rather than an arbitrary
+     bracket value (M12e, decisions.md D-F40). */
+  .grid-products {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: var(--space-4);
   }
 
   /* Button press (motion.md §2) */
