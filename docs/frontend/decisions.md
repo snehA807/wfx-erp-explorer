@@ -1126,3 +1126,107 @@ conversation. Production verified independently afterward (43/43 live
 Playwright checks against `https://wfx-explorer.vercel.app`, including a
 real end-to-end Ask turn and a CORS preflight against the production
 backend) rather than trusted on the requester's report alone.
+
+## D-F65 — M12i follow-up: Ask workspace layout rebuilt as a real bounded-height split, thread width widened to 960px
+Requested directly by the requester after seeing M12i live: the Ask page
+still read as a landing page rather than a ChatGPT/Claude/Perplexity-style
+workspace — large symmetric whitespace in the hero, and a much worse dead
+gap between the last message and the composer once a thread existed.
+Layout/styling only, no change to API/streaming/state/routing/other
+components, per the requester's explicit constraint.
+
+**Root cause (diagnosed live, matches the requester's own ask to identify
+it before changing anything):** `<main>` (`AppShell.tsx`) has never
+established a *bounded* height anywhere in the tree — it's `flex-1` inside
+a grow-only `min-h-screen` ancestor. Without a bounded parent, there is no
+way to build a real "scrollable conversation + fixed footer" split, so
+D-F64's own fix (`min-h-screen` on the thread column + `mt-auto` on the
+composer) could only *approximate* "composer stays at the bottom" — it
+actually meant "the whole column is forced to one full viewport height and
+the composer is margin-pushed to its bottom edge," which produces exactly
+the dead-space symptom being reported for any thread shorter than one
+viewport.
+
+**Fix — `<main>` becomes a real bounded flex column, but only on `/`:**
+`isAsk ? "flex h-screen flex-col overflow-hidden" : "flex-1"`
+(`AppShell.tsx`). The other four pages are untouched (`flex-1` inside the
+unbounded ancestor, same as before M12i) — verified with a full 5-route
+regression sweep at both viewports, zero overflow, zero console errors.
+Ask's own tree now does the rest, each piece filling whatever height
+`<main>` actually gives it instead of assuming its own fresh 100vh:
+- `AskHero.tsx`: `min-h-screen` → `h-full min-h-0 flex-1` (still centers —
+  requirement was explicit that *only* the empty hero state stays
+  centered — it just centers within the real available height now instead
+  of forcing a second nested 100vh that would have been clipped by main's
+  new `overflow-hidden`).
+- The hero-phase wrapper div in `pages/ask/index.tsx` (the collapse-
+  transition `<div>`) gained `flex h-full min-h-0 flex-1 flex-col` so
+  `AskHero`'s own `h-full` has something real to resolve against.
+- The thread-phase return in `pages/ask/index.tsx` now renders two
+  siblings inside a `flex min-h-0 flex-1 flex-col` wrapper: a
+  `min-h-0 flex-1 overflow-y-auto` scroll region holding the turns
+  (`mx-auto max-w-thread`, `pt-8`/`pb-6`), and a `shrink-0` footer holding
+  the composer (`mx-auto max-w-thread`). The composer is a completely
+  ordinary flex child now — it doesn't need `sticky`, `mt-auto`, or any
+  positioning trick to "stay at the bottom," because it structurally isn't
+  part of the region that scrolls. Verified live (mocked SSE, since the
+  production backend was down during this session — see below): scrolling
+  the conversation region to any position leaves the composer's
+  `getBoundingClientRect()` byte-for-byte identical.
+- Mobile-tab-bar clearance (D-F64 finding #3) and the palette-trigger/
+  first-pill clearance (D-F64 finding #2) both still hold: `<main>` kept
+  its existing `pb-20 md:pb-6` padding (so the composer footer still sits
+  above `MobileTabs` without needing `.composer-dock`'s old sticky-offset
+  math), and the scroll region's `pt-8` combined with `<main>`'s own
+  `pt-6` still totals 56px of top clearance on mobile — comfortably past
+  the trigger's ~52px measured bottom edge.
+- **Cleanup, not scope creep**: `AskComposer`'s `pinned` prop and
+  `tokens.css`'s `.composer-dock` utility (both from D-F64) had exactly
+  one caller each, and that caller stopped needing them once the composer
+  became a structural flex child instead of a positioned overlay. Removed
+  both rather than leave a dead, misleading toggle — the requester's "only
+  layout/styling" boundary was read as "don't change unrelated components'
+  behavior," not "leave known-dead code in place."
+
+**Thread width widened 760px → 960px**, a single token
+(`--ask-thread-max-width`, `tokens.css`) — requested explicitly ("900-1000px
+range… resemble ChatGPT/Claude/Perplexity"), overriding design-system.md
+§6's originally locked "max 760." Logged per CLAUDE.md rather than silently
+kept at the old value; every consumer (`AskHero`, the thread column, the
+composer footer) derives from the one token, so nothing drifted out of
+sync.
+
+**Verification method:** the production backend
+(`https://wfx-erp-explorer.onrender.com`) was returning `502` with
+`x-render-routing: no-deploy` on every endpoint throughout this session —
+a real, separate infrastructure issue (not CORS, not caused by this
+change) flagged to the requester directly, out of scope to fix here (no
+Render access). Verified instead via: (1) `npm run build`/strict TS clean;
+(2) a Playwright route-interception mock of `POST /query`'s SSE shape and
+`GET /health`, driving a 4-turn thread and confirming the composer's
+bounding box is identical before/after scrolling the conversation region,
+plus mobile composer/tab-bar and trigger/pill clearance measured directly;
+(3) a full 5-route × 2-viewport regression sweep (mocked `/health` only)
+confirming zero horizontal overflow and zero console errors on the four
+untouched pages. Not re-verified against the live production backend or
+redeployed to Vercel as part of this follow-up — that's a separate step
+once Render is confirmed healthy again.
+
+**Favicon (separate, unrelated request bundled in the same session):**
+`public/favicon.svg` — a simplified shirt/collar glyph (white,
+`--surface`-adjacent `#FAFAF9`) on the same near-black rounded badge as
+the sidebar mark (`Sidebar.tsx`'s existing `bg-action` + `Shirt` icon
+badge), redrawn as a handful of straight path segments rather than
+lucide's actual `Shirt` glyph so it stays legible at 16px (verified by
+rendering the real SVG at 16/32/64px against both light and dark
+backdrops via a throwaway Playwright harness before finalizing).
+`public/favicon.ico` is a hand-built multi-resolution container (16+32px)
+embedding the PNG renders directly — no new dependency; ICO's PNG-payload
+form has been supported by every relevant target since Vista and is
+`file`-verified valid. `public/apple-touch-icon.png` is a **separate**
+180×180 render using the *unrounded* square variant of the same mark
+(iOS applies its own corner mask; shipping the pre-rounded version would
+show unmasked corner slivers). Wired into `index.html` (`rel="icon"`
+SVG primary, `rel="alternate icon"` ICO fallback, `rel="apple-touch-icon"`,
+plus a matching `theme-color` meta) and confirmed present in both the dev
+server and the production `dist/` build output.

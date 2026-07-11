@@ -13,8 +13,6 @@ export interface AskComposerProps {
    * turn, not lose it the moment a stream starts. */
   disabled?: boolean;
   autoFocus?: boolean;
-  /** Bottom-pinned thread presentation vs. the hero's inline centered one. */
-  pinned?: boolean;
   className?: string;
 }
 
@@ -28,7 +26,7 @@ const VERTICAL_PADDING_PX = 16;
  * implementation-plan.md M12g acceptance). Lime focus glow on inset
  * (motion.md §2, `.focus-glow-inset` from tokens.css).
  */
-export function AskComposer({ onSubmit, disabled, autoFocus, pinned, className }: AskComposerProps) {
+export function AskComposer({ onSubmit, disabled, autoFocus, className }: AskComposerProps) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -57,7 +55,7 @@ export function AskComposer({ onSubmit, disabled, autoFocus, pinned, className }
   }
 
   return (
-    <div className={cn("w-full max-w-thread", pinned && "composer-dock z-shell", className)}>
+    <div className={cn("w-full max-w-thread", className)}>
       <div className="focus-glow-inset flex items-end gap-2 rounded-lg border border-inset-border bg-inset-surface p-2 shadow-float">
         <Textarea
           ref={textareaRef}

@@ -7,9 +7,9 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 the build at."
 
 **Last updated:** 2026-07-11
-**Current milestone:** M12i — Polish, Production Deployment, and Release (implementation-plan.md M12i section)
-**Status:** ✅ Complete — frontend feature-complete and deployed to production
-**Next milestone:** None. Per the M12i kickoff instruction, no further implementation is performed after this milestone; feature freeze is in effect.
+**Current milestone:** M12i — Polish, Production Deployment, and Release (implementation-plan.md M12i section), plus one requester-directed follow-up (Ask workspace layout rebuild + favicon — see below)
+**Status:** ✅ M12i complete and deployed. The follow-up is code-complete and verified locally/via mocks, but **not yet redeployed** — the production backend is currently down (`502`/`no-deploy` on every endpoint, flagged to the requester) so the follow-up wasn't re-verified against a live backend or pushed to Vercel yet.
+**Next milestone:** None new. Outstanding before this is fully closed out: confirm the Render backend is healthy again, re-verify the follow-up against it, and redeploy the frontend.
 
 ## Milestone status
 
@@ -916,3 +916,58 @@ work that has in fact shipped and been verified.
     milestone's changes) rather than re-run a third time against production.
   - `docs/frontend/decisions.md` gained D-F64. Commit: `feat(frontend): M12i
     polish, deploy, release`.
+- **M12i follow-up (post-deploy, requester-directed):** two requester-driven
+  fixes on top of the already-shipped M12i, not a new numbered milestone.
+  1. **Ask workspace layout rebuild.** The requester reported the live
+     production Ask page still read as a landing page rather than a
+     ChatGPT/Claude/Perplexity-style workspace — large symmetric hero
+     whitespace, and (worse) a dead gap between the last message and the
+     composer once a thread existed. Root cause: `<main>` (`AppShell.tsx`)
+     has never had a *bounded* height, so nothing in the tree could build a
+     real "scrollable conversation + fixed footer" split — M12i's own D-F64
+     fix (`min-h-screen` + `mt-auto`) could only approximate "composer
+     stays at the bottom," and that approximation is exactly what produced
+     the dead-space symptom for any thread shorter than one viewport.
+     Fixed by making `<main>` a real `h-screen` bounded flex column *only*
+     on the Ask route (`AppShell.tsx`; the other four pages are untouched —
+     confirmed with a full 5-route regression sweep, zero overflow, zero
+     console errors), with the Ask thread splitting into an independently
+     scrolling `flex-1 overflow-y-auto` conversation region and a
+     structural (not sticky/margin-hack) `shrink-0` composer footer.
+     `AskHero` now fills whatever height `<main>` actually gives it instead
+     of assuming a fresh 100vh (still centers — the hero-only-centered
+     requirement didn't change). Also widened the thread column
+     760px → 960px (single token, `--ask-thread-max-width`) at the
+     requester's explicit direction, overriding design-system.md §6's
+     originally-locked 760 value. Full detail, including the exact mobile
+     clearance math re-verified after the restructure, in
+     `docs/frontend/decisions.md` D-F65.
+  2. **Favicon.** The deployed site had no favicon at all (default browser
+     icon). Added `public/{favicon.svg,favicon.ico,apple-touch-icon.png}` —
+     a simplified shirt/collar glyph on the same dark badge as the sidebar
+     mark, redrawn simpler than lucide's actual icon so it stays legible at
+     16px (verified by rendering the real file at 16/32/64px on light and
+     dark backdrops before finalizing), plus a hand-built multi-resolution
+     ICO and an unrounded 180px apple-touch-icon (iOS applies its own
+     corner mask). Wired into `index.html`; confirmed present in both the
+     dev server and the production `dist/` build.
+  - **Verification gap, flagged not silently worked around:** the
+    production backend (`https://wfx-erp-explorer.onrender.com`) was
+    returning `502` with `x-render-routing: no-deploy` on every endpoint
+    throughout this session — confirmed live via direct `curl`, not
+    transient (retried after a delay, still 502). This is a real,
+    separate infrastructure issue, most likely triggered by the Render
+    `CORS_ORIGINS` env var edit from the M12i deploy step, and is out of
+    scope to fix from this session (no Render access; backend is frozen).
+    Flagged directly to the requester. As a consequence, this follow-up's
+    layout changes were verified via build/strict-TS, a Playwright
+    route-interception mock of the `/query` SSE shape and `/health`
+    (driving a real multi-turn thread and measuring the composer's
+    bounding box before/after scrolling), and a full regression sweep on
+    mocked health — **not** against the live production backend, and
+    **not** redeployed to Vercel. Both remain outstanding once Render is
+    confirmed healthy again: re-verify against the real backend, then
+    redeploy the frontend (same manual `vercel --prod` flow as M12i, since
+    the CLI login still doesn't complete from this environment).
+  - `docs/frontend/decisions.md` gained D-F65. Commit: `fix(frontend): Ask
+    workspace layout rebuild + favicon`.

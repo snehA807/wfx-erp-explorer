@@ -138,10 +138,13 @@
      decisions.md D-F45 (M12f). */
   --filter-rail-width: 260px;
 
-  /* Ask thread reading measure (design-system.md §6: "Ask thread: single
-     column, max 760"). Same D-F22/D-F28/D-F40/D-F45 pattern — named in
-     prose, no variable assigned there. Logged in decisions.md (M12g). */
-  --ask-thread-max-width: 760px;
+  /* Ask thread reading measure. design-system.md §6 originally named "max
+     760"; widened to 960 at the requester's explicit direction in the M12i
+     polish follow-up (ChatGPT/Claude/Perplexity-width workspace, "900-1000px"
+     range) — a live instruction overriding the locked doc value, logged here
+     per CLAUDE.md rather than silently kept at the old number. Single token,
+     so AskHero/thread column/composer all stay in sync automatically. */
+  --ask-thread-max-width: 960px;
 
   /* Mobile tab label (m12c-contract.md §4): 11px is named explicitly by
      navigation.md but isn't in the type scale (micro is 12px), so it earns
@@ -507,24 +510,6 @@
      bracket value in component code. */
   .pb-safe-bottom {
     padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  /* AskComposer's pinned/docked bottom offset (M12i polish). Below 768px
-     MobileTabs (~64px measured live, m12c-contract.md §4) is a fixed
-     bottom bar the composer must clear instead of sitting behind it — env()
-     and a measured constant have no Tailwind utility, so (matching
-     .pb-safe-bottom's own precedent) this lives here rather than an
-     arbitrary bracket value on the component. md+ has no MobileTabs, so the
-     offset collapses back to the ordinary --space-4 gap used everywhere
-     else sticky/fixed elements sit off an edge. */
-  .composer-dock {
-    position: sticky;
-    bottom: calc(64px + env(safe-area-inset-bottom) + var(--space-2));
-  }
-  @media (min-width: 768px) {
-    .composer-dock {
-      bottom: var(--space-4);
-    }
   }
 
   /* FilterRail full variant, desktop (M12i polish): caps the sticky facet

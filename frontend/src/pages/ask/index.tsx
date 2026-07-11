@@ -179,7 +179,7 @@ export default function AskPage() {
         {paletteTrigger}
         <div
           className={cn(
-            "transition-all duration-slow ease-out-app",
+            "flex h-full min-h-0 flex-1 flex-col transition-all duration-slow ease-out-app",
             heroPhase === "collapsing" && !reducedMotion && "-translate-y-4 opacity-0",
           )}
         >
@@ -192,14 +192,25 @@ export default function AskPage() {
   return (
     <>
       {paletteTrigger}
-      <div className="mx-auto flex min-h-screen w-full min-w-0 max-w-thread flex-col gap-6 pb-4 pt-12">
-        {turns.map((turn, index) => (
-          <div key={turn.id} className="flex min-w-0 flex-col gap-3">
-            <UserTurn text={turn.question} />
-            <AICard turn={turn} defaultSqlOpen={index === 0} onRetry={() => retryTurn(turn.id, turn.question)} />
+      {/* Real ChatGPT/Claude-style split: a bounded flex column (matches
+          <main>'s own h-screen from AppShell) with an independently
+          scrolling conversation region and a footer that's structurally
+          always at the bottom — no sticky/margin-auto tricks needed, since
+          it isn't part of the scrollable area at all. */}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto flex w-full min-w-0 max-w-thread flex-col gap-6 pb-6 pt-8">
+            {turns.map((turn, index) => (
+              <div key={turn.id} className="flex min-w-0 flex-col gap-3">
+                <UserTurn text={turn.question} />
+                <AICard turn={turn} defaultSqlOpen={index === 0} onRetry={() => retryTurn(turn.id, turn.question)} />
+              </div>
+            ))}
           </div>
-        ))}
-        <AskComposer onSubmit={submitQuestion} disabled={isStreaming} pinned className="mt-auto" />
+        </div>
+        <div className="mx-auto w-full shrink-0 max-w-thread pb-4 pt-3">
+          <AskComposer onSubmit={submitQuestion} disabled={isStreaming} />
+        </div>
       </div>
     </>
   );

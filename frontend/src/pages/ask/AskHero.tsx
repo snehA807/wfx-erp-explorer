@@ -19,7 +19,7 @@ export interface AskHeroProps {
  */
 export function AskHero({ onSubmit, chips }: AskHeroProps) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-8 px-4 py-16 text-center">
+    <div className="flex h-full min-h-0 flex-1 flex-col items-center justify-center gap-8 px-4 py-16 text-center">
       <div className="w-full max-w-thread">
         <h1 className="text-role-display text-inset-text">Ask the catalog anything</h1>
         <p className="mt-3 text-role-body text-inset-text-2">

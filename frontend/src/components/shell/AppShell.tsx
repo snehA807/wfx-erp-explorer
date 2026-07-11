@@ -68,7 +68,15 @@ export function AppShell() {
           <ColdStartBanner visible={showBanner} onDismiss={() => setDismissed(true)} />
           <main
             className={cn(
-              "mx-auto w-full min-w-0 max-w-content flex-1 px-4 pb-20 pt-6 transition-colors duration-base md:px-6 md:pb-6",
+              "mx-auto w-full min-w-0 max-w-content px-4 pb-20 pt-6 transition-colors duration-base md:px-6 md:pb-6",
+              // Every other page is `flex-1` inside a grow-only (`min-h-screen`)
+              // ancestor and scrolls with the document, same as before. Ask is
+              // the one screen that needs a real bounded height so it can
+              // split into an independently scrolling conversation region +
+              // a footer composer that's actually always at the bottom,
+              // instead of faking it with sticky/margin tricks (M12i polish
+              // follow-up — see docs/frontend/decisions.md).
+              isAsk ? "flex h-screen flex-col overflow-hidden" : "flex-1",
               isAsk && "inset",
             )}
             {...(isAsk ? MACHINE_SURFACE_ATTR : {})}
