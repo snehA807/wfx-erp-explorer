@@ -21,12 +21,17 @@ export interface ProductCardProps {
    * plain catalog browsing (Products) where there's no query to score
    * against. */
   matchScore?: number;
-  /** Smaller presentation for DetailPanel's "More like this" strip. The
-   * palette's compact `row` variant (component-library.md §4) is M12h scope
-   * — not built here (D-F37's incremental-growth pattern: add a variant
-   * when its real consumer exists, not preemptively). */
+  /** Smaller presentation for DetailPanel's "More like this" strip. */
   size?: "default" | "compact";
-  onOpen: (styleNumber: string) => void;
+  /** "card" (default) is the grid/strip presentation below. "row" is the
+   * command palette's compact horizontal list-item presentation
+   * (component-library.md §4, built in M12h — D-F37's incremental-growth
+   * pattern: this is the variant's real second consumer). Unstyled and
+   * non-interactive itself; the `CommandItem` wrapping it in CommandPalette
+   * owns selection/keyboard handling, so it renders a plain `div`, not
+   * another nested button. */
+  variant?: "card" | "row";
+  onOpen?: (styleNumber: string) => void;
   className?: string;
 }
 
@@ -36,15 +41,51 @@ export interface ProductCardProps {
  * are untrusted). Card recipe: border + hover lift, no shadow at rest
  * (design-system.md §9).
  */
-export function ProductCard({ product, matchScore, size = "default", onOpen, className }: ProductCardProps) {
+export function ProductCard({
+  product,
+  matchScore,
+  size = "default",
+  variant = "card",
+  onOpen,
+  className,
+}: ProductCardProps) {
   const [imgError, setImgError] = useState(false);
   const isCompact = size === "compact";
   const showBadge = matchScore !== undefined && matchScore >= MATCH_BADGE_THRESHOLD;
 
+  if (variant === "row") {
+    return (
+      <div className={cn("flex min-w-0 flex-1 items-center gap-3", className)}>
+        <div className="relative h-10 w-8 shrink-0 overflow-hidden rounded-sm bg-bg">
+          {imgError ? (
+            <CategoryPlaceholder category={product.category} className="h-full w-full" />
+          ) : (
+            <img
+              src={product.image_url}
+              alt=""
+              className="h-full w-full object-cover"
+              loading="lazy"
+              onError={() => setImgError(true)}
+            />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-role-small font-medium text-text">{product.style_name}</p>
+          <p className="truncate text-role-small text-text-2">
+            {product.style_number} · {product.category ?? "Uncategorized"}
+          </p>
+        </div>
+        {showBadge ? (
+          <span className="shrink-0 text-role-micro text-text-2">{Math.round(matchScore * 100)}% match</span>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"
-      onClick={() => onOpen(product.style_number)}
+      onClick={() => onOpen?.(product.style_number)}
       className={cn(
         "card-hover flex flex-col overflow-hidden rounded-lg border border-border bg-surface text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
         className,

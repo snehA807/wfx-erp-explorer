@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { DetailPanel } from "@/components/DetailPanel";
 import { EmptyState } from "@/components/EmptyState";
 import { PageTitle } from "@/components/PageTitle";
+import { CommandPaletteTrigger } from "@/components/shell/CommandPalette";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDetailPanelRoute } from "@/lib/hooks/useDetailPanelRoute";
@@ -49,6 +50,7 @@ export default function VisualSearchPage() {
         title="Visual Search"
         description="Searches what garments look like, not just their metadata."
         meta={hasQuery && !loading ? `${items.length.toLocaleString("en-IN")} results` : undefined}
+        actions={<CommandPaletteTrigger />}
       />
 
       <Input

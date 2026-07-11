@@ -164,11 +164,22 @@ export default {
           "0%, 100%": { opacity: 1 },
           "50%": { opacity: 0.5 },
         },
+        // Palette open (motion.md §2: "fade + scale 0.98 -> 1, 150ms"). No
+        // `tailwindcss-animate` plugin is installed (M12b's sanctioned-deps
+        // list omits it), so the shadcn-vendored `animate-in`/`zoom-in-95`
+        // classes on Dialog/Sheet/Command are inert; this hand-rolled
+        // keyframe follows the same pattern already used for the three
+        // above rather than adding a new dependency (decisions.md, M12h).
+        "palette-in": {
+          from: { opacity: 0, transform: "translate(-50%, -50%) scale(0.98)" },
+          to: { opacity: 1, transform: "translate(-50%, -50%) scale(1)" },
+        },
       },
       animation: {
         "fade-rise": "fade-rise var(--dur-slow) var(--ease-out-app) both",
         "caret-blink": "caret-blink 1s steps(1) infinite",
         "dot-pulse": "dot-pulse 2.4s ease-in-out infinite",
+        "palette-in": "palette-in var(--dur-base) var(--ease-out-app) both",
       },
     },
   },

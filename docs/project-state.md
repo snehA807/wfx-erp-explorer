@@ -7,9 +7,9 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 the build at."
 
 **Last updated:** 2026-07-11
-**Current milestone:** M12g — AI Query (flagship) (implementation-plan.md M12g section; no separate contract doc)
-**Status:** ✅ Complete
-**Next milestone:** M12h — Analytics + Command Palette
+**Current milestone:** M12h — Analytics + Command Palette (implementation-plan.md M12h section; no separate contract doc)
+**Status:** ✅ Complete (stretch dynamic-chart slot cut per the pre-authorized cut order — see below)
+**Next milestone:** M12i — Polish, deploy, handoff
 
 ## Milestone status
 
@@ -27,7 +27,7 @@ the build at."
 | M9 | Offline embeddings job | 1 — Backend core | ✅ Complete |
 | M10 | Search endpoints | 1 — Backend core | ✅ Complete |
 | M11 | Backend to production | 2 — Deploy early 🔴 | ✅ Complete |
-| M12 | Frontend foundation | 3 — Frontend | 🟡 In progress (M12a–M12g done) |
+| M12 | Frontend foundation | 3 — Frontend | 🟡 In progress (M12a–M12h done) |
 | M13 | Dashboard + Products screens | 3 — Frontend | ⬜ Not started |
 | M14 | Ask AI screen | 3 — Frontend | ⬜ Not started |
 | M15 | Search, Visual, Detail drawer | 3 — Frontend | ⬜ Not started |
@@ -742,3 +742,63 @@ the build at."
     `docs/frontend/decisions.md` D-F56.
   - `docs/frontend/decisions.md` gained D-F50–D-F56. Commit:
     `feat(frontend): M12g ai query`.
+- **M12h (Command Palette + Productivity, implementation-plan.md's M12h
+  section — no separate contract doc, navigation.md §5 is the full verb
+  spec):** `components/shell/CommandPalette.tsx` (the palette itself +
+  the exported `CommandPaletteTrigger`), `lib/hooks/useCommandPalette.tsx`
+  (a small React Context provider for the shared open/close state — the
+  first provider in the app, justified per m12b-contract.md §8's own
+  threshold: AppShell and every page's title-block trigger are genuinely
+  separate trees needing the same boolean). Global ⌘K/Ctrl+K toggle,
+  four verb groups in navigation.md §5's documented order (Ask, Search
+  products + up to 5 live results, Go to, Recent), inset styling with a
+  top Seam (sanctioned location 1), focus trap + return-to-invoker (both
+  free from Radix Dialog), a hand-rolled 150ms fade+scale open animation.
+  - `components/ProductCard.tsx` gained its documented `variant: "row"`
+    (D-F58) — the palette's live results are its second consumer, per
+    D-F37's incremental-growth pattern. `components/shell/Sidebar.tsx`
+    exported its existing `NAV_ITEMS` for reuse in the "Go to" group
+    (second usage site). `components/shell/AppShell.tsx` wraps its return
+    in the new `CommandPaletteProvider` and mounts `CommandPalette`
+    (replacing the M12c stub-mount comment). `pages/ask/index.tsx` gained
+    a small mount effect consuming `location.state.autoAsk` (D-F60) —
+    reuses the page's own existing `submitQuestion()`, no duplicated
+    thread logic. `pages/{overview,products,search,visual}/index.tsx` each
+    pass `<CommandPaletteTrigger />` as `PageTitle`'s `actions`; Ask (no
+    PageTitle, D-F01) gets a fixed-corner placement instead (D-F61).
+  - **Two real doc/backend gaps found and worked around, not silently
+    deviated from** (D-F57): navigation.md's literal `GET
+    /products?search=` for live results doesn't exist on the frozen
+    backend — the same gap M12e already found and logged as D-F40 for the
+    Products toolbar. Reused the real `POST /search/products` (M10/M12f)
+    instead, `limit: 5`. Separately (D-F59): `tailwindcss-animate` was
+    never added as a dependency back in M12b, so the shadcn-vendored
+    `animate-in`/`zoom-in-95` classes already present on
+    `Dialog`/`Sheet`/`Command` are inert app-wide (a pre-existing gap, out
+    of scope to fix here) — the palette's own "fade + scale 0.98→1,
+    150ms" open animation is hand-rolled in `tailwind.config.js` instead,
+    the same way `fade-rise`/`caret-blink`/`dot-pulse` already are, rather
+    than adding a new dependency to light up dead classes elsewhere.
+  - **Stretch scope cut, not attempted** (D-F62): implementation-plan.md
+    names the dynamic bar-chart slot in `AICard` as the milestone's one
+    optional item and lists it first in the pre-authorized cut order.
+    `AICard` is untouched this milestone.
+  - `npm run build` clean, strict TS clean, grep acceptance check
+    (m12b-contract.md §13.2 pattern) clean.
+  - **Verified live via a throwaway Playwright harness** (M12b–M12g
+    pattern, Chromium cached, `playwright` installed `--no-save` in
+    `frontend/`, deleted after use): **37/37 checks green** against the
+    Vite dev server proxying the real production backend — ⌘K/toggle/Esc
+    on all five routes including Ask (no PageTitle); real Go-to
+    navigation; the Ask verb running a genuine end-to-end turn via
+    `state.autoAsk`; the Search-products verb navigating to `/search?q=`;
+    5 real live product results from production `/search/products`
+    opening a real DetailPanel via `?style=`; Recent populated after
+    those actions and confirmed hidden in a fresh session; a
+    keyboard-only pass; a verified focus trap; reduced-motion emulation;
+    a 375px pass (trigger + palette fit, no hardware shortcut assumed);
+    zero console errors throughout, including an 8-route regression
+    sweep. One harness-timing-only bug found and fixed mid-run, not a
+    product bug (D-F63).
+  - `docs/frontend/decisions.md` gained D-F57–D-F63. Commit:
+    `feat(frontend): M12h command palette`.

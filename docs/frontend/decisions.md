@@ -896,3 +896,141 @@ instant swap. A full 8-route regression sweep (5 app routes + `/dev-tokens`
 `AppShell.tsx` change: zero console errors on any route — confirms the
 route-conditional `.inset` main column is not a regression on the other
 four pages. `npm run build` clean, strict TS clean, grep acceptance check
+
+## D-F57 — Command palette's live results reuse `POST /search/products`, not the literal `GET /products?search=`
+navigation.md §5 and architecture.md's data-source table both name
+`GET /products?search=` as the palette's live-result source. That endpoint
+doesn't exist on the frozen backend — `ProductListParams` has no `search`
+field and `extra="forbid"` would 422 it — the exact gap M12e already found
+and logged as D-F40 for the Products toolbar's own quick-filter. Rather
+than inventing new backend surface (CLAUDE.md invariant 3/backend-frozen,
+and implementation-plan.md's own M12h "Out of scope: any new backend call
+beyond `GET /products?search=`" — read as "don't add further surface,"
+not as license to fabricate the literal named one), the palette's "Search
+products" live results reuse the real, already-shipped
+`POST /search/products` (M10/M12f) at `limit: 5`. Same resolution D-F40
+already applied to the toolbar; this is the second usage site, not a new
+pattern.
+
+## D-F58 — `ProductCard` gains its documented `variant: "row"` presentation
+component-library.md §4 names a compact `row` variant for the palette's
+live results as `ProductCard`'s eventual second consumer; D-F37 explicitly
+deferred building it until that consumer existed. This is that consumer.
+`variant: "row"` renders a plain non-interactive `<div>` (thumbnail + name/
+meta + optional match-score text, no border/hover chrome of its own) rather
+than the default variant's `<button>` — it's always used inside a `cmdk`
+`CommandItem`, which is already the interactive, keyboard-selectable
+element; nesting another native button inside it would be invalid HTML and
+would fight `CommandItem`'s own selection/keyboard handling. `onOpen`
+became optional (`(styleNumber: string) => void | undefined`) since the row
+variant doesn't call it itself — the wrapping `CommandItem`'s `onSelect`
+owns navigation instead. No existing call site is affected (all pass
+`onOpen`; only the new palette usage omits it).
+
+## D-F59 — Command palette open animation is hand-rolled, not the vendored `animate-in`/`zoom-in-95` classes
+Discovered while wiring motion.md §2's "Palette open: fade + scale 0.98 ->
+1, 150ms": `tailwindcss-animate` (the plugin that gives the shadcn-vendored
+`animate-in`/`fade-in-0`/`zoom-in-95`/`slide-in-from-*` classes on
+`Dialog`/`Sheet`/`Command` any actual effect) is not in `package.json` —
+M12b's own sanctioned-deps list (§11) never added it. Those classes are
+present in the vendored files (shadcn CLI's default output) but currently
+inert everywhere they appear, including `DetailPanel`'s Sheet slide and the
+base `Dialog`'s fade+zoom — a pre-existing gap from M12b/M12e, out of scope
+to fix here (no drive-by fixes; DetailPanel's own motion isn't part of this
+milestone). Rather than adding a new dependency to light up the existing
+dead classes (CLAUDE.md: "ask before adding dependencies," and the fix
+would ripple beyond this milestone's named files), the palette's own open
+animation is hand-rolled the same way `fade-rise`/`caret-blink`/`dot-pulse`
+already are (tailwind.config.js `keyframes`/`animation`, `var(--dur-base)
+var(--ease-out-app)`): a new `palette-in` keyframe (opacity 0->1, `scale(.98
+-> 1)`) applied via `data-[state=open]:animate-palette-in`. Reduced motion
+is free — the existing global `animation-duration: 0.01ms !important` block
+(tokens.css Region 5) already collapses it, same as every other named
+animation. Only "open" is implemented; motion.md §2's inventory names no
+"palette close" duration, so close is an instant unmount (Radix's default
+when no exit animation is configured), consistent with reading the
+inventory literally rather than inventing a symmetrical entry.
+
+## D-F60 — Ask's "Ask: {typed text}" auto-submit uses router `state`, not a URL param
+navigation.md §5's "Ask row auto-submits" and "Recent" (re-running a past
+question) both need to land on `/` with a question pre-filled and
+immediately submitted. `AskPage` owns its whole thread as local
+`useReducer` state (D-F05) with no external trigger surface, so the
+command palette (a different part of the tree) needs some channel to tell
+it "run this text once." A `?q=` URL param was the other candidate — style
+consistent with `?style=`/filter params elsewhere — but rejected: those
+params encode *persistent, shareable view state* (a reload should restore
+them); an auto-ask is a one-time imperative action that must not re-fire on
+refresh or back-navigation, and would need its own extra "already
+consumed" bookkeeping to avoid exactly that. `navigate("/", { state:
+{ autoAsk: text } })` plus a mount-effect in `AskPage` that reads
+`location.state.autoAsk`, calls the page's own existing `submitQuestion()`
+(unchanged — already handles hero-collapse, `addRecent`, and running the
+turn, so nothing is duplicated), and immediately clears the state via
+`navigate(".", { replace: true, state: null })` is the smaller, more
+honest fit — and matches `useDetailPanelRoute.ts`'s own precedent of a ref
+(not state) guarding one-time navigation side effects against React 18
+StrictMode's double-invoked dev effect (`consumedAutoAskRef`).
+
+## D-F61 — Ask's palette trigger is a fixed corner button, not a title-block one
+navigation.md §5: "Trigger affordance: slim ghost … button in each page
+title block." D-F01 has Ask deliberately render no `PageTitle` at all (the
+dark hero *is* the page's heading), so there is no title block for the
+other four pages' literal placement (`PageTitle`'s `actions` slot) to
+target. Rather than forcing a `PageTitle`-shaped element onto Ask against
+D-F01's own reasoning, or silently dropping the click affordance that
+mobile depends on (navigation.md §6: "no hardware shortcut assumed"),
+`CommandPaletteTrigger` renders at a fixed top-right corner position,
+present across both the hero and thread phases (a sibling element outside
+the phase-conditional branch in `pages/ask/index.tsx`, so it survives the
+hero-collapse swap without re-mounting). Same token classes as every other
+page's trigger — they resolve through the "-current" family, so it reads
+correctly on Ask's `.inset` surface with no variant prop needed.
+
+## D-F62 — M12h stretch (dynamic chart in `AICard`) cut per the pre-authorized cut order
+implementation-plan.md names the `AICard` bar-chart slot as "STRETCH ONLY…
+ships or is cut whole" and lists it as cut-order item #1 — the single
+highest-priority thing to drop under any time pressure, ahead of even
+palette live-results. Not attempted: the milestone's required scope (⌘K
+everywhere, Ask/Search/Go-to/Recent groups, live results, focus trap) is
+the full time budget, and building an optional, independently-risky
+feature (SQL-shape detection + a new Recharts consumer inside `AICard`)
+first would be scope creep against "implement ONLY the current milestone."
+`AICard` is untouched this milestone, matching implementation-plan.md's own
+"Files modified: AICard (stretch slot)" being conditional on the stretch
+being attempted at all.
+
+## D-F63 — M12h live verification method
+Verified via a throwaway Playwright harness (M12b-M12g pattern — Chromium
+cached from earlier milestones; `playwright` installed `--no-save` in
+`frontend/` per D-F56's precedent, deleted after use) against the Vite dev
+server on port 5173 proxying the real production backend. **37/37 checks
+green** across two runs: ⌘K/Ctrl+K opens the palette on all five routes
+including Ask (which has no `PageTitle`); the trigger button opens it too,
+on both desktop and a 375px viewport (no hardware shortcut assumed); a
+second ⌘K toggles it closed; Esc closes it and returns focus to the
+invoking trigger button; a real `Go to > Products` selection navigates and
+closes the palette; typing renders the `Ask:`/`Search products:` rows only
+once there's typed text (confirmed absent on the empty-query state, which
+shows only Go To + Recent); the `Ask:` row navigates to `/`, and the typed
+question genuinely appears as a real `UserTurn` and runs an end-to-end
+turn (D-F60's `state.autoAsk` path, live, not mocked); `Search products:`
+navigates to `/search?q=`; live product results (5, real production
+`POST /search/products` hits, D-F57) render with match-score text and
+correct thumbnails; clicking one opens the real `DetailPanel` via
+`/products?style=`; Recent shows entries after the above actions (capped,
+confirmed absent in a fresh browser context with empty
+`sessionStorage`); a keyboard-only pass (type, arrow through Go To, Enter)
+executes and closes; Tab-cycling while open never leaves the dialog
+(`role="dialog"` contains `document.activeElement` throughout — the focus
+trap); reduced-motion emulation still opens/functions correctly with no
+crash; zero console errors across the full flow, an 8-route regression
+sweep, and the 375px pass. One real timing-only harness bug found and
+fixed during this run, not a product bug: the first assertion checked
+`isVisible()` on the trigger button immediately after Vite's `load` event,
+before React had finished its first render — a `.click()` a few lines
+later on the same locator succeeded because Playwright's `click()`
+auto-waits for actionability, exposing the mismatch. Fixed by waiting for
+visibility explicitly before asserting it (same class of harness-only
+issue as D-F39/D-F49, not a product defect). `npm run build` clean, strict
+TS clean, grep acceptance check (m12b-contract.md §13.2 pattern) clean.

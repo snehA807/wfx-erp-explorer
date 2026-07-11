@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { FilterRail, type CategoricalFilterKey } from "@/components/FilterRail";
 import { PageTitle } from "@/components/PageTitle";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
+import { CommandPaletteTrigger } from "@/components/shell/CommandPalette";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -83,6 +84,7 @@ export default function ProductsPage() {
         title="Products"
         description="Browse the full finished-goods catalog."
         meta={meta ? `${meta.total.toLocaleString("en-IN")} results` : undefined}
+        actions={<CommandPaletteTrigger />}
       />
 
       <div className="flex flex-col gap-4">

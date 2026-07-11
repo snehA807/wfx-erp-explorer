@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { FilterRail, type CategoricalFilterKey, type GsmRange } from "@/components/FilterRail";
 import { PageTitle } from "@/components/PageTitle";
 import { ProductCard, ProductCardSkeleton } from "@/components/ProductCard";
+import { CommandPaletteTrigger } from "@/components/shell/CommandPalette";
 import { Input } from "@/components/ui/input";
 import { useDetailPanelRoute } from "@/lib/hooks/useDetailPanelRoute";
 import { useFilterOptions } from "@/lib/hooks/useFilterOptions";
@@ -81,6 +82,7 @@ export default function SearchPage() {
         title="Search"
         description="Describe what you're looking for — fabric, style, mood."
         meta={hasQuery && !loading ? `${items.length.toLocaleString("en-IN")} results` : undefined}
+        actions={<CommandPaletteTrigger />}
       />
 
       <Input

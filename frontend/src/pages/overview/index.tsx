@@ -6,6 +6,7 @@ import { ChartCard, ChartCardSkeleton } from "@/components/ChartCard";
 import { EmptyState } from "@/components/EmptyState";
 import { PageTitle } from "@/components/PageTitle";
 import { ResultTable, ResultTableSkeleton } from "@/components/ResultTable";
+import { CommandPaletteTrigger } from "@/components/shell/CommandPalette";
 import { StatCard, StatCardSkeleton } from "@/components/StatCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { formatCrore, formatDate, formatNumber } from "@/lib/format";
@@ -24,7 +25,11 @@ export default function OverviewPage() {
 
   return (
     <>
-      <PageTitle title="Overview" description="Revenue, orders, and category breakdown at a glance." />
+      <PageTitle
+        title="Overview"
+        description="Revenue, orders, and category breakdown at a glance."
+        actions={<CommandPaletteTrigger />}
+      />
 
       {error ? (
         <EmptyState

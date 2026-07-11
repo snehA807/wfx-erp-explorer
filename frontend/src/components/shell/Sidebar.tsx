@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 // Repo URL sourced from the origin remote (m12c-contract.md §3 footer link).
 const REPO_URL = "https://github.com/snehA807/wfx-erp-explorer";
 
-interface NavItem {
+export interface NavItem {
   to: string;
   label: string;
   icon: LucideIcon;
@@ -25,8 +25,11 @@ interface NavItem {
   end?: boolean;
 }
 
-// navigation.md §3/§4: the five routes in frequency order.
-const NAV_ITEMS: NavItem[] = [
+// navigation.md §3/§4: the five routes in frequency order. Exported for the
+// command palette's "Go to" verb group (navigation.md §5) — same five
+// routes, second usage site, same reuse pattern as D-F45's FilterRail
+// consolidation.
+export const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Ask", icon: Sparkles, end: true },
   { to: "/overview", label: "Overview", icon: LayoutDashboard },
   { to: "/products", label: "Products", icon: ShoppingBag },
