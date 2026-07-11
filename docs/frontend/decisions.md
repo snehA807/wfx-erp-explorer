@@ -728,3 +728,171 @@ slider's downstream "Clear all" button check had also failed as a
 consequence (no active filters left to render the button once the GSM
 commit silently no-opped), confirming the failure was a single root
 cause, not two independent bugs.
+
+## D-F50 — M12g touched `AppShell.tsx` and `tokens.css`/`tailwind.config.js` despite implementation-plan.md's literal "Files modified: —"
+implementation-plan.md's M12g row lists no files modified outside
+`pages/ask/*`. Two things could not be built within that literal boundary
+without either violating a locked value or leaving a named requirement
+unsatisfiable:
+1. **Light<->inset route crossfade (motion.md §3.2):** "150ms background
+   crossfade on the main column only" requires an element that persists
+   across the route navigation — page components fully unmount/remount, so
+   only AppShell's `<main>` can crossfade rather than abruptly swap.
+   `AppShell.tsx` now reads `useLocation()` and applies `.inset` +
+   `transition-colors duration-base` to `<main>` only when the pathname is
+   `/`, plus `MACHINE_SURFACE_ATTR` for grep-ability (`lib/theme.ts`'s own
+   documented convention). Pre-authorized by m12c-contract.md §10: "the
+   light<->inset route crossfade... ships with M12g's first real inset
+   surface."
+2. **UserTurn's light pill on a now-inset Ask canvas (D-F09):** with the
+   whole Ask main column `.inset`, a component needs to deliberately
+   opt out of the ambient dark scope to render the "small light human"
+   pill design-system.md §11 requires. No existing utility does this
+   without either an arbitrary Tailwind bracket value (forbidden,
+   invariant 7) or bypassing the token system. Added `.light` to
+   `tokens.css` (Region 2b) — the exact mirror of `.inset` (Region 2) in
+   reverse, restoring light `-current` values for a nested subtree.
+   Unlike `.inset`, it does not also redeclare `color`/`background-color`
+   directly: `UserTurn` always sets its own explicit `bg-surface`/
+   `text-text` classes, so D-F24's unstyled-descendant problem doesn't
+   apply here.
+3. `--ask-thread-max-width: 760px` added to `tokens.css`/`tailwind.config.js`
+   (`max-w-thread`) — design-system.md §6 names "Ask thread: single
+   column, max 760" as an exact px value with no assigned variable, same
+   D-F22/D-F28/D-F40/D-F45/D-F45 pattern. Used on the hero, the thread
+   column, and the composer.
+
+All three are small, structurally necessary, and consistent with existing
+precedent (tokens.css additions are explicitly pre-approved by
+design-system.md §13's "adding a token = one-line rationale," and
+m12c-contract.md §10 explicitly anticipated the AppShell change) — flagged
+here per CLAUDE.md's "flag conflicts instead of silently deviating" rather
+than silently expanded scope.
+
+## D-F51 — Hero collapse duration rounded to the nearest real token (200ms), not a new 250ms token
+motion.md §2 names the hero-collapse row as "250ms, one-time" — a duration
+that matches none of motion.md §1's four tokens (`--dur-fast` 100,
+`--dur-base` 150, `--dur-slow` 200, `--dur-zoom` 300). Unlike D-F50's
+token additions (each names an exact, load-bearing pixel/width value),
+this is a cosmetic timing choice on implementation-plan.md's own
+explicitly lowest-priority, first-cuttable item in the cut order ("Hero
+collapse animation (instant swap)"). Reused `--dur-slow` (200ms) instead
+of minting a fifth duration token for one animation. `pages/ask/index.tsx`
+comments this at the call site.
+
+## D-F52 — AICard footer meta: D-F20's `done` shape resolved for M12g
+D-F20 (M12a) flagged that the real `/query` `done` payload is
+`{sql_model, sql_prompt_tokens, sql_completion_tokens, sql_cost_usd,
+answer_model, answer_prompt_tokens, answer_completion_tokens,
+answer_cost_usd, total_cost_usd}`, not design-system.md §11's documented
+flat `{model, tokens, cost}` trio, and left the actual M12g rendering
+choice open. Resolved in `AICard.tsx`'s `Footer`: `sql_model` and
+`answer_model` joined with "→" (falls back to "model unavailable" if both
+are absent — the type says non-null but the backend's Pydantic model
+allows `None`, so this is defensive, not expected in the happy path);
+all four token counts summed into one figure; `total_cost_usd` (already
+`sql_cost_usd + answer_cost_usd`, computed server-side) shown to 4 decimal
+places given real per-call costs run ~$0.0002. Satisfies design-system.md
+§11's literal "model · tokens · cost" footer copy from the richer real
+shape.
+
+## D-F53 — AICard's error-code branches: `SQL_BLOCKED` special-cased, everything else shares one generic branch
+component-library.md's AICard spec names three error buckets
+(`SQL_BLOCKED` amber notice, `LLM_UNAVAILABLE` in-card retry, "execution
+error" = failed SQL kept visible + message). The real deployed backend
+(`backend/app/core/errors.py`) has no `LLM_UNAVAILABLE` code — only
+`LLM_ERROR` (D-F20-style doc/backend naming mismatch, flagged not fixed,
+consistent with the rest of this doc's precedent). Since `LLM_ERROR`'s
+spec'd treatment ("in-card retry") and "execution error"'s spec'd
+treatment ("failed SQL kept visible + plain-language message") are
+functionally identical once already-arrived sections (SQL/RESULT) are
+rendered unconditionally above the notice, both are implemented as one
+generic danger-toned `ErrorNotice` + Retry branch, covering `LLM_ERROR`,
+`SERVICE_UNAVAILABLE`, `INTERNAL_ERROR`, and the client-synthesized
+`NETWORK_ERROR` (see D-F54). Only `SQL_BLOCKED` gets its own distinct,
+retry-less `BlockedNotice` (a deliberate refusal, not a transient
+failure — re-running the identical question would just be blocked again;
+the notice offers a rephrase suggestion instead of a Retry button, per
+D-F10's "calm, visible product feature" framing).
+
+## D-F54 — Client-synthesized `NETWORK_ERROR` for streams that end without a terminal SSE event
+`lib/sse.ts` (frozen for this milestone, not in M12g's file list) yields
+whatever events arrive and simply stops when the underlying
+`ReadableStream` closes — it does not itself detect "the connection
+dropped before `done`/`error` ever arrived" as a distinct condition. This
+is exactly implementation-plan.md's J2 acceptance case ("kill backend
+mid-stream → error event renders, thread survives, retry works").
+`pages/ask/index.tsx`'s `runTurn()` tracks whether a terminal event
+(`done`/`error`) was ever seen; if the async generator completes without
+one, it dispatches a synthetic `{code: "NETWORK_ERROR", ...}` turn error
+so the turn always resolves to a rendered state rather than hanging
+mid-pipeline forever. Verified live via Playwright route interception
+(a truncated SSE body fulfilling only `status`+`sql`, then closing) —
+renders the generic error notice with the SQL section from before the
+drop still visible, and Retry successfully re-runs the turn to
+completion.
+
+## D-F55 — J2 live finding: "delete all orders" resolves to `LLM_ERROR`, not `SQL_BLOCKED`, on the real backend
+navigation.md's J2 literally names asking "delete all orders" as the path
+to "same card anatomy, amber notice, blocked SQL visible." Verified live
+against production during M12g acceptance: this exact phrase raises
+`LLMError("The model did not return a SQL query")` inside
+`nl2sql.py::generate_sql()` — the model refuses in plain prose with no
+SELECT/WITH-shaped text at all, so `extract_sql()` rejects it *before*
+`enforce_guardrails()` (and therefore `SQL_BLOCKED`) is ever reached. This
+is not a new finding: it exactly matches M8's own decisions.md entry,
+which already treated "an outright destructive request ('delete all
+orders') — refused by the model itself, LLM_ERROR" as a *separate* tested
+path from "an adversarial prompt engineered to make the model emit real
+DELETE SQL text (caught by guardrails, SQL_BLOCKED)" — M8 never claimed
+the literal phrase trips SQL_BLOCKED either. Two adversarial live
+rephrasings tried this session (a direct prompt-injection attempt, and an
+"exact statement" framing) both also resolved to `LLM_ERROR`; the
+prompt-injection attempt additionally produced a real, notable live LLM
+behavior worth flagging: the model emitted a decoy `SELECT 1` and then
+wrote an answer *falsely claiming* "one cancelled sales order has been
+deleted" — a hallucination over harmless data, not an actual guardrail
+bypass (no write ever executed; the read-only DB role and `guardrails.py`
+were never actually tested by this particular prompt). Backend is frozen
+for this milestone, so this is flagged, not fixed. Since `AICard`'s
+`SQL_BLOCKED` render path (`BlockedNotice`) is deterministic frontend code
+independent of whether a live LLM can be reliably coaxed into it on
+demand, it was verified instead via a mocked SSE `error` event
+(`code: "SQL_BLOCKED"`, `details.sql` set) — confirmed the amber notice,
+the blocked SQL staying visible, and the rephrase suggestion all render
+correctly. The live "delete all orders" check was kept as a real,
+passing verification of the `LLM_ERROR` in-card-retry path instead.
+
+## D-F56 — M12g live verification method
+Verified via a throwaway Playwright harness (M12b-M12f pattern — Chromium
+cached, reinstalled at the pinned revision; `playwright` itself installed
+`--no-save` directly in `frontend/` rather than the scratchpad this time,
+since Node's ESM resolution needs the importing script co-located with
+`node_modules` — both deleted after use) against the Vite dev server on
+port 5173 (CORS requirement, D-F31's carry-over) proxying the real
+production backend. **30/30 checks green** on the final run: hero
+renders with all 4 suggestion chips and a labeled composer; clicking a
+chip collapses the hero (h1 removed) and a real J1 turn runs end-to-end
+against production — SQL visible (measured 2-24s across the session, real
+OpenRouter latency, not frontend-controlled, so not asserted as a hard
+gate against implementation-plan.md's aspirational "<1s on warm backend"),
+open by default on the first turn and collapsed by default on the second,
+keyword-tinted, Copy button producing a real "Copied" toast (needed
+`context.grantPermissions(["clipboard-write"])` — headless Chromium
+denies clipboard access by default, a harness requirement not a product
+bug); ResultTable (inset) rendering real rows capped at 10; the Answer
+region carrying `aria-live="polite"` with real non-empty streamed text;
+the footer rendering real `sql_model → answer_model · N tokens · $cost`
+sourced from the actual `done` payload; zero console errors across the
+full turn. SQL_BLOCKED (mocked, D-F55) and the live LLM_ERROR path both
+verified (D-F55); the J2 mid-stream-drop scenario (mocked, D-F54)
+rendered its error notice with the pre-drop SQL still visible and Retry
+completing a real second request. Enter submits, Shift+Enter inserts a
+real newline without submitting, Esc clears the composer. A keyboard-only
+pass (Tab to a chip, Enter to activate) reached and submitted successfully.
+Reduced-motion emulation collapsed the hero-collapse transition to an
+instant swap. A full 8-route regression sweep (5 app routes + `/dev-tokens`
++ `/ask` and an unknown path, both still redirecting to `/`) after the
+`AppShell.tsx` change: zero console errors on any route — confirms the
+route-conditional `.inset` main column is not a regression on the other
+four pages. `npm run build` clean, strict TS clean, grep acceptance check

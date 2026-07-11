@@ -113,6 +113,8 @@ export default {
         content: "var(--content-max-width)",
         // DetailPanel Sheet width (component-library.md §4, decisions.md D-F40).
         detail: "var(--detail-panel-width)",
+        // Ask thread reading measure (design-system.md §6, decisions.md M12g).
+        thread: "var(--ask-thread-max-width)",
       },
       width: {
         // Shell-structural widths (m12c-contract.md §2, decisions.md D-F28).

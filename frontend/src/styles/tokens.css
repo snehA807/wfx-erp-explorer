@@ -138,6 +138,11 @@
      decisions.md D-F45 (M12f). */
   --filter-rail-width: 260px;
 
+  /* Ask thread reading measure (design-system.md §6: "Ask thread: single
+     column, max 760"). Same D-F22/D-F28/D-F40/D-F45 pattern — named in
+     prose, no variable assigned there. Logged in decisions.md (M12g). */
+  --ask-thread-max-width: 760px;
+
   /* Mobile tab label (m12c-contract.md §4): 11px is named explicitly by
      navigation.md but isn't in the type scale (micro is 12px), so it earns
      its own token rather than an arbitrary Tailwind bracket value. Logged
@@ -270,6 +275,27 @@
      dark-on-dark. */
   background-color: hsl(var(--bg-current));
   color: hsl(var(--text-current));
+}
+
+/* ---- Region 2b: .light break-out scope -----------------------------------
+   M12g addition (logged in decisions.md). Ask's UserTurn pills are a
+   deliberate exception to their ambient .inset surface — design-system.md
+   §11: "small right-aligned light pills — the size/tone asymmetry (small
+   light human / full-width dark machine) is intentional grammar" (D-F09).
+   Mirrors .inset's own mechanism exactly in reverse, restoring the light
+   "-current" values for a subtree nested inside .inset. Unlike .inset
+   (Region 2), this does not also redeclare `color`/`background-color`
+   directly: every consumer of `.light` (UserTurn) already sets its own
+   explicit `bg-*`/`text-*` utility classes, so there is no unstyled-
+   descendant case to guard against (D-F24 doesn't apply here). */
+.light {
+  --bg-current: var(--bg);
+  --surface-current: var(--surface);
+  --border-current: var(--border);
+  --text-current: var(--text);
+  --text-2-current: var(--text-2);
+  --seam-current: var(--seam);
+  --ring-current: var(--ring);
 }
 
 /* ---- Region 3: shadcn bridge ---------------------------------------------

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 
 import { Toaster } from "@/components/ui/toaster";
 import { useHealth } from "@/lib/hooks/useHealth";
+import { MACHINE_SURFACE_ATTR } from "@/lib/theme";
+import { cn } from "@/lib/utils";
 
 import { ColdStartBanner } from "./ColdStartBanner";
 import { MobileTabs } from "./MobileTabs";
@@ -23,6 +25,14 @@ const COLD_START_KEY = "wfx.coldstart.shown";
  */
 export function AppShell() {
   const { status, health, isSlow } = useHealth();
+  // Light<->inset route transition (motion.md §3.2): Ask ("/") is the one
+  // whole-page machine surface (D-F02). <main> is the only DOM node that
+  // persists across route navigation within this layout route, so it's the
+  // only place a real crossfade (not an abrupt mount/unmount swap) can live
+  // — logged as an M12g deviation from implementation-plan.md's literal
+  // "Files modified: —" for this milestone, pre-authorized by
+  // m12c-contract.md §10 ("ships with M12g's first real inset surface").
+  const isAsk = useLocation().pathname === "/";
 
   // Session-once gate (§6): a ref (not state) for the sessionStorage read so
   // it's evaluated exactly once, before the first isSlow transition can race it.
@@ -51,7 +61,13 @@ export function AppShell() {
       <Sidebar status={status} />
       <div className="flex min-h-screen flex-1 flex-col">
         <ColdStartBanner visible={showBanner} onDismiss={() => setDismissed(true)} />
-        <main className="mx-auto w-full max-w-content flex-1 px-4 pb-20 pt-6 md:px-6 md:pb-6">
+        <main
+          className={cn(
+            "mx-auto w-full max-w-content flex-1 px-4 pb-20 pt-6 transition-colors duration-base md:px-6 md:pb-6",
+            isAsk && "inset",
+          )}
+          {...(isAsk ? MACHINE_SURFACE_ATTR : {})}
+        >
           <Outlet />
           {/* Command palette mount point (M12h) — marked stub only: no
               component is rendered here and no ⌘K listener is attached. */}

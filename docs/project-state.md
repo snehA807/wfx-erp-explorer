@@ -7,9 +7,9 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 the build at."
 
 **Last updated:** 2026-07-11
-**Current milestone:** M12f — Search + Visual Search (implementation-plan.md M12f section; no separate contract doc)
+**Current milestone:** M12g — AI Query (flagship) (implementation-plan.md M12g section; no separate contract doc)
 **Status:** ✅ Complete
-**Next milestone:** M12g — AI Query (flagship)
+**Next milestone:** M12h — Analytics + Command Palette
 
 ## Milestone status
 
@@ -27,7 +27,7 @@ the build at."
 | M9 | Offline embeddings job | 1 — Backend core | ✅ Complete |
 | M10 | Search endpoints | 1 — Backend core | ✅ Complete |
 | M11 | Backend to production | 2 — Deploy early 🔴 | ✅ Complete |
-| M12 | Frontend foundation | 3 — Frontend | 🟡 In progress (M12a–M12f done) |
+| M12 | Frontend foundation | 3 — Frontend | 🟡 In progress (M12a–M12g done) |
 | M13 | Dashboard + Products screens | 3 — Frontend | ⬜ Not started |
 | M14 | Ask AI screen | 3 — Frontend | ⬜ Not started |
 | M15 | Search, Visual, Detail drawer | 3 — Frontend | ⬜ Not started |
@@ -673,3 +673,72 @@ the build at."
     D-F49.
   - `docs/frontend/decisions.md` gained D-F45–D-F49. Commit:
     `feat(frontend): M12f search + visual search`.
+- **M12g (AI Query / flagship, implementation-plan.md's M12g section — no
+  separate contract doc):** `pages/ask/{index,reducer,chips,AskHero,
+  AskComposer,AICard,SQLBlock,UserTurn,SuggestionChips}.tsx` — the Ask page
+  rewritten wholesale from M12c's PageTitle placeholder into the full AI
+  workspace: dark hero (4 suggestion chips, verbatim assignment questions
+  from `golden_queries.yaml` pairs 1-9, D-F18) → 250ms-ish hero collapse →
+  a `useReducer` thread of `UserTurn`/`AICard` pairs → a bottom-docked
+  `AskComposer`. `AICard` is the flagship: `SeamProgress` wired to the
+  real backend pipeline stage names (`generating_sql`/`running_query`/
+  `writing_answer`/`done`/`error`, not a looser sketch enum) → `SQLBlock`
+  (keyword-tinted, collapsible, copy-to-clipboard) → `ResultTable` (inset,
+  capped at 10) → streamed `ANSWER` prose with a blinking caret and
+  `aria-live="polite"` → a footer sourced from the real `done` meta shape.
+  Every documented state is implemented: loading (SeamProgress + status
+  narration, no skeleton, per motion.md §5), streaming, `SQL_BLOCKED`
+  (calm amber notice, blocked SQL kept visible, rephrase suggestion, no
+  retry), other error codes (one shared danger notice + Retry, covering
+  the real backend's `LLM_ERROR`/`SERVICE_UNAVAILABLE`/`INTERNAL_ERROR`
+  plus a client-synthesized `NETWORK_ERROR` for a stream that ends without
+  a terminal SSE event), and success.
+  - Wired the existing (frozen, unmodified) `lib/sse.ts` client to the
+    production `/query` endpoint — `pages/ask/index.tsx`'s `runTurn()` is
+    the only consumer, translating each SSE event into a reducer action
+    and detecting a dropped connection (stream ends without `done`/`error`)
+    as its own `NETWORK_ERROR` case (D-F54).
+  - Two small, justified deviations from implementation-plan.md's literal
+    "Files modified: —": `components/shell/AppShell.tsx` now applies
+    `.inset` + a `transition-colors` crossfade to `<main>` only on the Ask
+    route (motion.md §3.2's light↔inset route transition needs a DOM node
+    that persists across navigation — only AppShell's `<main>` qualifies;
+    pre-authorized by m12c-contract.md §10), and `tokens.css`/
+    `tailwind.config.js` gained a `.light` break-out scope (UserTurn's
+    "small light human pill" on the now-dark Ask canvas, D-F09) plus
+    `--ask-thread-max-width` (design-system.md §6's named-but-unassigned
+    "760" reading measure). Full detail in `docs/frontend/decisions.md`
+    D-F50–D-F54.
+  - **Real live finding, not a bug:** navigation.md's J2 names asking
+    "delete all orders" verbatim as the path to `SQL_BLOCKED`. Verified
+    live against production: that exact phrase (and two further
+    adversarial rephrasings tried this session) resolves to `LLM_ERROR`
+    instead — the model refuses in prose before guardrails ever run —
+    exactly matching M8's own decisions.md precedent, which already
+    treated the literal phrase as the `LLM_ERROR` case and a *separate*
+    adversarial prompt as the `SQL_BLOCKED` case. One adversarial attempt
+    additionally produced a live LLM hallucination worth flagging (a decoy
+    `SELECT 1` paired with an answer falsely claiming a row was deleted,
+    with no write ever executed) — backend-frozen, flagged not fixed.
+    `AICard`'s `SQL_BLOCKED` render path was verified instead via a
+    deterministic mocked SSE `error` event. Full detail in
+    `docs/frontend/decisions.md` D-F55.
+  - `npm run build` clean, strict TS clean, grep acceptance check
+    (m12b-contract.md §13.2 pattern) clean.
+  - **Verified live via a throwaway Playwright harness** (M12b–M12f
+    pattern, Chromium cached, deleted after use; `playwright` installed
+    `--no-save` directly in `frontend/` this time for Node ESM resolution
+    reasons, also deleted after use): **30/30 checks green** against the
+    Vite dev server proxying the real production backend — a full J1 run
+    end-to-end (SQL visible, RESULT capped at 10, streamed ANSWER with
+    `aria-live`, real footer meta), SQL open-then-collapsed across turns,
+    a real clipboard-backed Copy → "Copied" toast, both J2 paths
+    (`SQL_BLOCKED` mocked, `LLM_ERROR` live), a mocked mid-stream
+    connection drop rendering an error notice with Retry recovering to a
+    real completion, Enter/Shift+Enter/Esc, a keyboard-only J1 pass,
+    reduced-motion collapsing the hero transition to an instant swap, and
+    a full 8-route regression sweep confirming the `AppShell.tsx` change
+    is not a regression elsewhere. Full detail in
+    `docs/frontend/decisions.md` D-F56.
+  - `docs/frontend/decisions.md` gained D-F50–D-F56. Commit:
+    `feat(frontend): M12g ai query`.
