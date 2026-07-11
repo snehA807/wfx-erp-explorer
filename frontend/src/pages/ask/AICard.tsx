@@ -39,9 +39,9 @@ export function AICard({ turn, defaultSqlOpen, onRetry }: AICardProps) {
   }, [turn.rows, turn.columns]);
 
   return (
-    <div className="inset overflow-hidden rounded-lg" data-surface="machine">
+    <div className="inset min-w-0 overflow-hidden rounded-lg" data-surface="machine">
       <SeamProgress state={seamState} stageIndex={turn.stageIndex} errorKind={errorKind} />
-      <div className="flex flex-col gap-5 bg-inset-surface p-5">
+      <div className="flex min-w-0 flex-col gap-5 bg-inset-surface p-5">
         {turn.error?.code === "SQL_BLOCKED" ? (
           <BlockedNotice sql={turn.error.sql} />
         ) : (
@@ -72,7 +72,7 @@ export function AICard({ turn, defaultSqlOpen, onRetry }: AICardProps) {
 
 function Section({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex min-w-0 flex-col gap-2">
       <p className="text-role-micro text-inset-text-2">{label}</p>
       {children}
     </div>

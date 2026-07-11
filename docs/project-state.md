@@ -7,9 +7,9 @@ convention"). Distinct from `docs/decisions.md` (spec deviations) and
 the build at."
 
 **Last updated:** 2026-07-11
-**Current milestone:** M12h — Analytics + Command Palette (implementation-plan.md M12h section; no separate contract doc)
-**Status:** ✅ Complete (stretch dynamic-chart slot cut per the pre-authorized cut order — see below)
-**Next milestone:** M12i — Polish, deploy, handoff
+**Current milestone:** M12i — Polish, Production Deployment, and Release (implementation-plan.md M12i section)
+**Status:** ✅ Complete — frontend feature-complete and deployed to production
+**Next milestone:** None. Per the M12i kickoff instruction, no further implementation is performed after this milestone; feature freeze is in effect.
 
 ## Milestone status
 
@@ -27,17 +27,26 @@ the build at."
 | M9 | Offline embeddings job | 1 — Backend core | ✅ Complete |
 | M10 | Search endpoints | 1 — Backend core | ✅ Complete |
 | M11 | Backend to production | 2 — Deploy early 🔴 | ✅ Complete |
-| M12 | Frontend foundation | 3 — Frontend | 🟡 In progress (M12a–M12h done) |
-| M13 | Dashboard + Products screens | 3 — Frontend | ⬜ Not started |
-| M14 | Ask AI screen | 3 — Frontend | ⬜ Not started |
-| M15 | Search, Visual, Detail drawer | 3 — Frontend | ⬜ Not started |
-| M16 | Polish pass | 3 — Frontend | ⬜ Not started |
-| M17 | Frontend to production | 3 — Frontend | ⬜ Not started |
+| M12 | Frontend foundation | 3 — Frontend | ✅ Complete (M12a–M12i done) |
+| M13 | Dashboard + Products screens | 3 — Frontend | ✅ Complete — delivered as M12d/M12e under `implementation-plan.md`'s sub-milestone plan, not this table's original per-screen split (see note below) |
+| M14 | Ask AI screen | 3 — Frontend | ✅ Complete — delivered as M12g |
+| M15 | Search, Visual, Detail drawer | 3 — Frontend | ✅ Complete — delivered as M12e/M12f |
+| M16 | Polish pass | 3 — Frontend | ✅ Complete — delivered as M12i (this milestone) |
+| M17 | Frontend to production | 3 — Frontend | ✅ Complete — delivered as M12i (this milestone): Vercel production deploy verified |
 | M18 | Docker Compose + documentation | 4 — Ship | ⬜ Not started |
 | M19 | Final evaluation + hardening | 4 — Ship | ⬜ Not started |
 | M20 | Video + submission | 4 — Ship | ⬜ Not started |
 
 🔴 = red-flagged risk milestone (playbook.md).
+
+**Note on M13–M17 (added at M12i close-out):** these rows are playbook.md's
+original per-screen milestone split. Actual frontend execution followed
+`docs/frontend/implementation-plan.md`'s finer-grained M12a–M12i sub-plan
+instead (each sub-milestone's own entry below already documents this),
+which covers the same scope under different milestone numbers. This table
+was never reconciled against that in real time across M12d–M12h; corrected
+here at the M12i close-out rather than left showing "Not started" against
+work that has in fact shipped and been verified.
 
 ## Open items carried into M10
 
@@ -802,3 +811,108 @@ the build at."
     product bug (D-F63).
   - `docs/frontend/decisions.md` gained D-F57–D-F63. Commit:
     `feat(frontend): M12h command palette`.
+- **M12i (Polish, Production Deployment, and Release, implementation-plan.md's
+  M12i section):** production-quality floor pass across all five screens plus
+  the Vercel deploy. No new features, no redesign — the design language stayed
+  frozen throughout; every change below is a fix or a spacing/positioning
+  refinement within the existing token system.
+  - **Three real, previously-undetected bugs found and fixed**, all only
+    surfaced by exercising a genuine multi-turn Ask session with real
+    production data at 375px — prior milestones' verification passes used
+    shorter or single-turn runs that never hit these paths (full detail in
+    `docs/frontend/decisions.md` D-F64):
+    1. **Whole-page horizontal overflow on mobile whenever an AI turn's SQL/
+       Result content was wide** (e.g. a multi-column join). Root cause:
+       `AppShell.tsx`'s own sidebar/content flex split (`<div className="flex
+       min-h-screen">` wrapping the content column) had no `min-w-0` on the
+       content column — a flex row item's default automatic minimum width is
+       its content's min-content size, so a wide, unwrapped SQL line or table
+       forced the *entire shell* wider than the viewport instead of scrolling
+       within its own already-present `overflow-x-auto` containers
+       (SQLBlock's `<pre>`, shadcn `Table`'s wrapping div). This is a
+       shell-level bug, not an Ask-page one — it predates M12i and was simply
+       never exercised at a narrow viewport with wide real content before.
+       Fixed with `min-w-0` on `AppShell.tsx`'s content column and `<main>`,
+       plus a defensive `min-w-0` chain down through the Ask thread column,
+       each turn wrapper, `AICard`, `Section`, `SQLBlock`, and
+       `ResultTable`'s own outer wrapper.
+    2. **The fixed command-palette trigger overlapped the first message pill
+       on the mobile Ask thread** — both are pinned to the top-right corner
+       at 375px once the sidebar disappears. Fixed with top clearance
+       (`pt-12`) on the thread column.
+    3. **The Ask composer didn't behave like a docked chat input** on two
+       counts: for a short thread it sat wherever normal document flow put
+       it (mid-screen, with empty space below) instead of the bottom of the
+       viewport, since `position: sticky` only pins during scroll and does
+       nothing when there's no overflow to scroll past; and its `bottom-4`
+       offset didn't know about the fixed mobile tab bar, so on a long
+       thread it would pin itself partially behind it. Fixed with
+       `min-h-screen` on the thread column + `mt-auto` on the composer
+       (docks it to the bottom of the viewport-height box when the thread is
+       short) and a new `.composer-dock` utility in `tokens.css` (mobile
+       clearance for `MobileTabs`' real height + `env(safe-area-inset-bottom)`,
+       collapsing to the ordinary `--space-4` edge gap at `md:`).
+  - **Viewport utilization fix, not a bug**: Search's `FilterRail` (`variant:
+    "full"`) rendered as a plain block, so its facet list (dozens of rows)
+    forced the whole page to its height even when the results column was a
+    single short `EmptyState` (the pre-query invite state) — most of that
+    height was pure unused canvas next to the short results column. Made the
+    desktop rail `sticky` + independently `overflow-y-auto`-capped via a new
+    `.filter-rail-scroll` utility (`tokens.css`), so a long facet list
+    scrolls in place instead of dictating page height. No behavior change to
+    the facets themselves; the mobile/tablet Sheet-trigger variant is
+    unaffected.
+  - Removed the `/dev-tokens` QA route and its eleven files (`app/router.tsx`,
+    `pages/dev-tokens/*` deleted) per the plan's explicit instruction — the
+    catch-all route now redirects it to `/` like any other unknown path,
+    verified live.
+  - `vercel.json` (SPA rewrite) created — implementation-plan.md's M12a entry
+    had it listed as a file this scaffold would eventually need but
+    explicitly held it until this milestone's deploy.
+  - **Vercel deploy**: the interactive `vercel login` OAuth handshake fails
+    from this session's sandboxed shell environment (`fetch failed` /
+    intermittent `403` from `api.vercel.com` — the CLI's own output shows it
+    fingerprinting the caller as an agent). Confirmed this isn't a local
+    network issue (raw `curl` to `vercel.com` succeeds); the login flow
+    itself is what doesn't complete non-interactively here. Per the
+    requester's choice, the deploy was performed by the requester directly
+    from their own terminal, following a command-by-command walkthrough
+    (login → link → set `VITE_API_BASE_URL` → `vercel --prod`) provided in
+    conversation, not committed as a separate doc since it's a one-time
+    operational runbook, not project state. Production URL:
+    `https://wfx-explorer.vercel.app`. `.vercel/` added to the root
+    `.gitignore` ahead of the link step; the Vercel CLI also auto-generated
+    its own `frontend/.gitignore` (`.vercel`, `.env*`) during the requester's
+    `vercel link`, kept as-is (harmless, standard CLI behavior).
+  - **Render CORS**: the deployed backend's `CORS_ORIGINS` env var (`backend/
+    app/core/config.py` → `main.py`'s `CORSMiddleware`) required the new
+    Vercel origin; the requester added it directly on Render (backend is
+    frozen — not a change made from this session). Verified live via a raw
+    `OPTIONS` preflight against the production backend with `Origin:
+    https://wfx-explorer.vercel.app`: `access-control-allow-origin` echoes
+    the origin back correctly.
+  - `npm run build` clean, strict TS clean (5 route chunks, down from 6 with
+    `/dev-tokens` gone), grep acceptance check (m12b-contract.md §13.2
+    pattern: zero raw hex/px/bracket values outside `tokens.css`/
+    `components/ui/`) clean.
+  - **Verified live via a throwaway Playwright harness** (M12b–M12h pattern,
+    `playwright` installed `--no-save` in `frontend/`, deleted after use),
+    run twice — once against the Vite dev server proxying production (during
+    the fix/inspect loop) and once directly against the live production URL
+    post-deploy: **43/43 checks green** on the production run — full 8-route
+    sweep (5 app routes + `/dev-tokens`/`/ask`/an unknown path all redirecting
+    to `/`) at both 1440px and 375px with zero horizontal overflow anywhere;
+    a direct hard-navigation hit on `/products` (not a client-side route
+    change) confirming the `vercel.json` SPA rewrite; the sidebar status dot
+    reading "Live" from the real production `/health`; a complete J1 turn
+    end-to-end against the live production backend (SQL visible, a real
+    streamed answer, zero overflow after completion); the same J1 turn at
+    375px confirming the composer no longer overlaps `MobileTabs`; Products
+    grid + DetailPanel, Search with a real query, and the command palette all
+    verified against the live production backend; zero console or failed-
+    request errors across every check. J2 (SQL_BLOCKED), reduced-motion, and
+    keyboard-only passes were re-confirmed against the dev-proxying run
+    (already covered end-to-end in M12g/M12h and unaffected by this
+    milestone's changes) rather than re-run a third time against production.
+  - `docs/frontend/decisions.md` gained D-F64. Commit: `feat(frontend): M12i
+    polish, deploy, release`.

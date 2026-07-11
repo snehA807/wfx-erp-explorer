@@ -509,6 +509,35 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 
+  /* AskComposer's pinned/docked bottom offset (M12i polish). Below 768px
+     MobileTabs (~64px measured live, m12c-contract.md §4) is a fixed
+     bottom bar the composer must clear instead of sitting behind it — env()
+     and a measured constant have no Tailwind utility, so (matching
+     .pb-safe-bottom's own precedent) this lives here rather than an
+     arbitrary bracket value on the component. md+ has no MobileTabs, so the
+     offset collapses back to the ordinary --space-4 gap used everywhere
+     else sticky/fixed elements sit off an edge. */
+  .composer-dock {
+    position: sticky;
+    bottom: calc(64px + env(safe-area-inset-bottom) + var(--space-2));
+  }
+  @media (min-width: 768px) {
+    .composer-dock {
+      bottom: var(--space-4);
+    }
+  }
+
+  /* FilterRail full variant, desktop (M12i polish): caps the sticky facet
+     column's own height to the viewport (minus its `xl:top-6` offset) so a
+     long facet list scrolls internally instead of forcing the whole page
+     to its height when the results column is short (e.g. Search's
+     empty-query invite state). 100vh/space-6 aren't expressible as a
+     Tailwind class without an arbitrary bracket value (invariant 7), so
+     this lives here rather than on the component. */
+  .filter-rail-scroll {
+    max-height: calc(100vh - var(--space-6) - var(--space-6));
+  }
+
   .caret-blink {
     animation: caret-blink 1s steps(1) infinite;
   }

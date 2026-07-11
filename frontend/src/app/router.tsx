@@ -8,8 +8,6 @@ const OverviewPage = lazy(() => import("../pages/overview"));
 const ProductsPage = lazy(() => import("../pages/products"));
 const SearchPage = lazy(() => import("../pages/search"));
 const VisualSearchPage = lazy(() => import("../pages/visual"));
-// M12b QA route (m12b-contract.md §12) — deleted at M12i, never linked from nav.
-const DevTokensPage = lazy(() => import("../pages/dev-tokens"));
 
 function withSuspense(Element: React.LazyExoticComponent<() => JSX.Element>) {
   return (
@@ -30,10 +28,6 @@ const router = createBrowserRouter([
       { path: "/visual", element: withSuspense(VisualSearchPage) },
     ],
   },
-  // /dev-tokens stays outside the shell (m12c-contract.md §1): a QA
-  // instrument, never linked from nav — wrapping it would put throwaway
-  // content inside the production frame for no verification benefit.
-  { path: "/dev-tokens", element: withSuspense(DevTokensPage) },
   { path: "/ask", element: <Navigate to="/" replace /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ]);

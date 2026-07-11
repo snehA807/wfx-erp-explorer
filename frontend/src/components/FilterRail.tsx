@@ -167,7 +167,12 @@ function FullFilterRail({
         </Sheet>
       </div>
 
-      <div className="hidden xl:block">{content}</div>
+      {/* M12i polish: sticky + independently scrollable on desktop so a
+          facet list taller than the results column (e.g. the empty-query
+          invite state) doesn't force the whole page to that height —
+          better viewport utilization, no behavior change to the facets
+          themselves. */}
+      <div className="filter-rail-scroll hidden overflow-y-auto xl:sticky xl:top-6 xl:block">{content}</div>
 
       <ActivePills
         active={active}

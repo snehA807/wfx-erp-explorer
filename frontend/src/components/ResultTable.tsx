@@ -29,7 +29,7 @@ export function ResultTable({ columns, rows, variant = "light", maxRows = 10, ce
   const isInset = variant === "inset";
 
   return (
-    <div className={cn(isInset && "inset", "rounded-lg border border-border bg-surface", className)}>
+    <div className={cn(isInset && "inset", "min-w-0 overflow-hidden rounded-lg border border-border bg-surface", className)}>
       <Table>
         <TableHeader>
           <TableRow className="border-border hover:bg-transparent">

@@ -57,7 +57,7 @@ export function AskComposer({ onSubmit, disabled, autoFocus, pinned, className }
   }
 
   return (
-    <div className={cn("w-full max-w-thread", pinned && "sticky bottom-4 z-shell", className)}>
+    <div className={cn("w-full max-w-thread", pinned && "composer-dock z-shell", className)}>
       <div className="focus-glow-inset flex items-end gap-2 rounded-lg border border-inset-border bg-inset-surface p-2 shadow-float">
         <Textarea
           ref={textareaRef}

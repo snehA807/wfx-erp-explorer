@@ -58,7 +58,7 @@ export function SQLBlock({ sql, defaultOpen = false, streaming, className }: SQL
   }
 
   return (
-    <div className={cn("overflow-hidden rounded-md border border-inset-border bg-inset", className)}>
+    <div className={cn("min-w-0 overflow-hidden rounded-md border border-inset-border bg-inset", className)}>
       <div className="flex items-center justify-between gap-2 border-b border-inset-border px-3 py-2">
         <button
           type="button"

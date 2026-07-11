@@ -64,11 +64,11 @@ export function AppShell() {
     <CommandPaletteProvider>
       <div className="flex min-h-screen">
         <Sidebar status={status} />
-        <div className="flex min-h-screen flex-1 flex-col">
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <ColdStartBanner visible={showBanner} onDismiss={() => setDismissed(true)} />
           <main
             className={cn(
-              "mx-auto w-full max-w-content flex-1 px-4 pb-20 pt-6 transition-colors duration-base md:px-6 md:pb-6",
+              "mx-auto w-full min-w-0 max-w-content flex-1 px-4 pb-20 pt-6 transition-colors duration-base md:px-6 md:pb-6",
               isAsk && "inset",
             )}
             {...(isAsk ? MACHINE_SURFACE_ATTR : {})}

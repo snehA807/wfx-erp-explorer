@@ -192,14 +192,14 @@ export default function AskPage() {
   return (
     <>
       {paletteTrigger}
-      <div className="mx-auto flex w-full max-w-thread flex-col gap-6 pb-4">
+      <div className="mx-auto flex min-h-screen w-full min-w-0 max-w-thread flex-col gap-6 pb-4 pt-12">
         {turns.map((turn, index) => (
-          <div key={turn.id} className="flex flex-col gap-3">
+          <div key={turn.id} className="flex min-w-0 flex-col gap-3">
             <UserTurn text={turn.question} />
             <AICard turn={turn} defaultSqlOpen={index === 0} onRetry={() => retryTurn(turn.id, turn.question)} />
           </div>
         ))}
-        <AskComposer onSubmit={submitQuestion} disabled={isStreaming} pinned />
+        <AskComposer onSubmit={submitQuestion} disabled={isStreaming} pinned className="mt-auto" />
       </div>
     </>
   );

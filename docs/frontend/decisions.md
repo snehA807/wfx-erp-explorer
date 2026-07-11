@@ -1034,3 +1034,95 @@ auto-waits for actionability, exposing the mismatch. Fixed by waiting for
 visibility explicitly before asserting it (same class of harness-only
 issue as D-F39/D-F49, not a product defect). `npm run build` clean, strict
 TS clean, grep acceptance check (m12b-contract.md §13.2 pattern) clean.
+
+## D-F64 — M12i: three real shell/thread bugs found and fixed, plus a Vercel-in-sandbox limitation
+Full context in `docs/project-state.md`'s M12i entry; this is the decision
+record for *why* each fix takes the shape it does.
+
+**1. `min-w-0` chain for the AI thread (mobile horizontal-overflow bug).**
+`AppShell.tsx`'s `<div className="flex min-h-screen">` (sidebar + content
+column) never gave the content column `min-w-0`. A flex row item's automatic
+minimum width defaults to its content's min-content size; once a real AI
+turn's SQL line or result table was wide enough (routine for a multi-column
+join), the content column — and with it the whole shell — was forced wider
+than the viewport, even though `SQLBlock`'s `<pre>` and shadcn `Table`'s own
+wrapper already had `overflow-x-auto`. Those inner scroll containers were
+never reached because the ancestor blowout happened first. Confirmed via
+direct DOM measurement (`getBoundingClientRect` on every element wider than
+the viewport) rather than guessing from the box model — the widest offending
+element was `AppShell.tsx`'s own content column, not anything in
+`pages/ask/*`. Fixed with `min-w-0` on that column and `<main>`
+(`AppShell.tsx`), plus the same on the Ask thread column, each turn wrapper,
+`AICard`'s two wrapper divs, `Section`, `SQLBlock`'s root, and
+`ResultTable`'s outer wrapper (`pages/ask/index.tsx`, `AICard.tsx`,
+`SQLBlock.tsx`, `components/ResultTable.tsx`) — belt-and-suspenders once the
+real root cause was fixed, so any future wide content anywhere in that chain
+degrades to an internal scrollbar instead of a page-wide one. This is a
+shell-level defect that predates M12i (present since M12c); it was never
+exercised because no prior milestone's verification pass drove a real,
+wide-result AI turn at a narrow viewport.
+
+**2. Palette trigger vs. first message pill (mobile Ask thread).**
+D-F61's fixed-corner `CommandPaletteTrigger` and `UserTurn`'s right-aligned
+pill both target the same top-right corner; below the sidebar's disappearance
+point (768px) they visibly collided. Fixed with `pt-12` on the thread column
+(`pages/ask/index.tsx`) — clears the trigger's height at every width rather
+than a breakpoint-conditional patch, on the reasoning that a uniform small
+top gap on the thread column is harmless at desktop and removes any risk of
+a narrower collision window between breakpoints.
+
+**3. AskComposer wasn't a real "docked" chat input.** `position: sticky`
+(the pre-M12i implementation) only affects behavior *while scrolling* — for
+a thread shorter than the viewport there is nothing to scroll past, so the
+composer just rendered at its ordinary flow position (visibly stranded
+mid-screen, per a live screenshot during inspection). Separately, its
+`bottom-4` offset had no awareness of `MobileTabs`' fixed bar, so on a long
+thread the sticky-pinned composer would land partially behind it. Fixed
+with two changes that compose: `min-h-screen` on the thread column
+(`pages/ask/index.tsx`, same pattern `AskHero` already uses) plus `mt-auto`
+on the composer's wrapper — for a short thread this pushes the composer to
+the bottom of that viewport-height box (true "docked" behavior); for a long
+thread `mt-auto` has no remaining space to act on and the composer's own
+sticky/dock positioning takes over during scroll. The offset itself moved
+from a raw `bottom-4` Tailwind class to a new `.composer-dock` utility
+(`tokens.css`, same rationale/pattern as `.pb-safe-bottom`): `calc(64px +
+env(safe-area-inset-bottom) + var(--space-2))` below 768px (measured
+`MobileTabs` height plus safe-area plus a small gap), collapsing to the
+ordinary `var(--space-4)` edge gap at `md:` where no tab bar exists. `64px`
+is a measured constant with no Tailwind-expressible token equivalent, same
+class of exception as `.pb-safe-bottom`'s `env()` value — logged per
+design-system.md §13's "adding a token = one-line rationale."
+
+**4. FilterRail viewport utilization (not a bug, a polish fix).** The desktop
+`"full"` variant rendered as a plain block; a long facet list (dozens of
+checkbox rows) dictated the whole page's height even when the adjacent
+results column was a single short `EmptyState`. Made it `xl:sticky` +
+independently `overflow-y-auto`-capped via a new `.filter-rail-scroll`
+utility (`tokens.css`): `max-height: calc(100vh - var(--space-6) -
+var(--space-6))`, matching `xl:top-6`'s own offset so the sticky rail never
+overflows past the viewport bottom. Same "no Tailwind-expressible value
+without an arbitrary bracket" exception as above. No behavior change to the
+facets themselves or to the `<1280px` Sheet-trigger variant.
+
+**5. Vercel deploy couldn't be completed from this session's sandbox.**
+`npx vercel login`'s OAuth handshake failed both from this session's default
+sandboxed Bash tool and — after confirming raw network egress works via
+`curl` with the sandbox disabled — from an explicit `dangerouslyDisableSandbox`
+run too, with a `TypeError: fetch failed` and an intermittent `403` from
+`api.vercel.com/v2/user` on retry. The Vercel CLI's own stderr output
+included a `<claude-code-hint … value="vercel@claude-plugins-official" />`
+line and an internal `agentName=claude-code_2-1-207_agent` debug field,
+indicating the CLI fingerprints and treats agent-driven invocations
+differently — the interactive OAuth device flow this login method depends on
+appears not to complete for that caller class in this environment (not a
+project misconfiguration; `vercel.json`/build settings were never reached).
+The requester independently hit the identical `fetch failed` error running
+`vercel login`/`vercel whoami` from their own local shell integration,
+confirming this isn't specific to the sandboxed tool call. Resolved by the
+requester performing the deploy directly from their own terminal (real
+browser-based OAuth, outside any agent-fingerprinted context), following an
+exact command/prompt/environment-variable walkthrough provided in
+conversation. Production verified independently afterward (43/43 live
+Playwright checks against `https://wfx-explorer.vercel.app`, including a
+real end-to-end Ask turn and a CORS preflight against the production
+backend) rather than trusted on the requester's report alone.
