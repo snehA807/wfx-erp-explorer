@@ -39,11 +39,11 @@ It's not a chatbot bolted onto a database — it's a full-stack platform: schema
 
 ## 🔗 Live Demo
 
-| | |
-|---|---|
-| **Frontend** | [your-app.vercel.app](https://your-app.vercel.app) *(replace with production URL)* |
-| **API** | [your-api.onrender.com](https://your-api.onrender.com) *(replace with production URL)* |
-| **API Docs (OpenAPI)** | `your-api.onrender.com/docs` |
+| Service | URL |
+|---------|-----|
+| **Frontend** | https://wfx-explorer.vercel.app |
+| **API** | https://wfx-erp-explorer.onrender.com |
+| **API Docs (OpenAPI)** | https://wfx-erp-explorer.onrender.com/docs |
 
 > The API runs on a free-tier instance and may take a few seconds to wake up on the first request after a period of inactivity.
 
